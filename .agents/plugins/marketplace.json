@@ -1,0 +1,19 @@
+{
+  "name": "boardwalk-labs",
+  "interface": {
+    "displayName": "Boardwalk"
+  },
+  "plugins": [
+    {
+      "name": "boardwalk",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  layout-check:
+    name: Verify the repo layout matches what each marketplace installer expects
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Codex marketplace structural check
+        # The `npx codex-plugin add` installer hard-codes
+        # `<repo>/plugins/<plugin-name>/` as the source path it copies into
+        # `~/.codex/plugins/<plugin-name>/`. If we ship without that exact
+        # directory in place, every Codex user gets an ENOENT and the plugin
+        # is unusable until we patch it. This check fails the PR first.
+        run: |
+          set -euo pipefail
+          test -f .agents/plugins/marketplace.json || {
+            echo "::error::missing .agents/plugins/marketplace.json (Codex marketplace catalog)"
+            exit 1
+          }
+          for name in $(jq -r '.plugins[].name' .agents/plugins/marketplace.json); do
+            payload="plugins/$name"
+            test -d "$payload" || {
+              echo "::error::Codex requires $payload/ to exist (codex-plugin's installer hard-codes this path)"
+              exit 1
+            }
+            test -f "$payload/.codex-plugin/plugin.json" || {
+              echo "::error::missing $payload/.codex-plugin/plugin.json (Codex manifest)"
+              exit 1
+            }
+            test -d "$payload/skills" || {
+              echo "::error::missing $payload/skills/ (consumed by all four harnesses)"
+              exit 1
+            }
+          done
+
+  claude-validate:
+    name: Validate Claude Code manifests with the official validator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate .

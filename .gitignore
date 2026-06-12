@@ -1,0 +1,8 @@
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Boardwalk CLI per-directory project link (if you run the CLI inside this repo)
+.boardwalk/

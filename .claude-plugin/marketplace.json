@@ -1,0 +1,28 @@
+{
+  "name": "boardwalk-labs",
+  "owner": {
+    "name": "Boardwalk Labs",
+    "email": "hello@boardwalk.sh"
+  },
+  "metadata": {
+    "description": "Official Boardwalk plugins for Claude Code.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "boardwalk",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "CLI-first Boardwalk workflows for Claude Code.",
+      "author": {
+        "name": "Boardwalk Labs",
+        "email": "hello@boardwalk.sh"
+      },
+      "homepage": "https://boardwalk.sh",
+      "repository": "https://github.com/boardwalk-labs/plugins",
+      "license": "MIT",
+      "keywords": ["boardwalk", "workflows", "agents", "cli"],
+      "category": "productivity"
+    }
+  ]
+}
