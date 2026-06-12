@@ -1,8 +1,8 @@
 # Boardwalk plugins
 
-Official plugins that teach agent harnesses how to drive [Boardwalk](https://boardwalk.sh) — the control plane for agent workflows.
+Official plugins that let agent harnesses drive the [Boardwalk](https://boardwalk.sh) CLI.
 
-One shared skill set (`use-boardwalk-cli`) packaged for **Claude Code, Codex, Cursor, and OpenClaw**. The skills document the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, and trigger agent workflows on the user's behalf.
+One shared skill set (`use-boardwalk-cli`) packaged for **Claude Code, Codex, Cursor, and OpenClaw**. The skills document the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, and trigger workflows on the user's behalf.
 
 ## Layout
 
