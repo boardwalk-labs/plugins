@@ -130,10 +130,10 @@ The CLI is provider-agnostic and works against any Boardwalk deployment. Overrid
 - `BOARDWALK_OAUTH_CLIENT_ID` / `BOARDWALK_OAUTH_PORT` — OAuth client id and the local callback port
 - `BOARDWALK_CONFIG_DIR` — where credentials + config are stored
 
-Example (drive a dev deployment):
+Example (drive a self-hosted or custom deployment):
 
 ```bash
-BOARDWALK_API_DOMAIN=https://api.dev.boardwalk.sh boardwalk login
+BOARDWALK_API_DOMAIN=https://boardwalk.your-company.com boardwalk login
 ```
 
 ## Quick reference
