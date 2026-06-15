@@ -10,7 +10,7 @@ Use this skill whenever the user needs to install, configure, or drive the first
 
 ## What a Boardwalk workflow is
 
-A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`) — or a package directory containing one. The program exports a pure-literal `meta` object that the platform compiles to the **manifest** (the control-plane contract: name, triggers, runtime). The program body does the work:
+A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`) — or a package directory containing one. The program exports a pure-literal `meta` object that the platform compiles to the **manifest** (the control-plane contract: slug, optional title, triggers, runtime). The program body does the work:
 
 - `agent(prompt, { model })` runs an LLM loop. **`model` is required and named per call** (e.g. `anthropic/claude-sonnet-4.5`); the workflow itself declares no model. `provider` is optional (defaults to the managed `boardwalk` lane).
 - Durable primitives — `secrets.get`, `sleep`, phases, `output`, artifacts, `workflows.call` — run in deterministic code. Secrets never reach the LLM context.
