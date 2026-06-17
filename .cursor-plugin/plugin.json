@@ -1,7 +1,7 @@
 {
   "name": "boardwalk",
   "displayName": "Boardwalk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Boardwalk for Cursor: CLI-first agent-workflow authoring and deploys.",
   "author": {
     "name": "Boardwalk Labs",
