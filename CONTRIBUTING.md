@@ -44,4 +44,13 @@ npm install -g @anthropic-ai/claude-code
 claude plugin validate .
 ```
 
-CI runs the same validation plus a Codex install smoke test. Bump the `version` field in every manifest together when you change the shipped payload.
+CI (`.github/workflows/ci.yml`) runs on every pull request:
+
+- **All manifest JSON is well-formed:** `jq` parses every per-harness manifest (the Claude validator only covers `.claude-plugin/*`, so this is what guards the Cursor / OpenClaw / Codex manifests).
+- **Manifest versions are in sync:** every shipped manifest must carry the same `version`. This is what fails the build if you forget one when bumping.
+- **Codex marketplace layout:** the exact `plugins/<name>/{.codex-plugin/plugin.json,skills/}` paths the `codex-plugin` installer copies must be in place.
+- **Claude Code validation:** `claude plugin validate .`, the official validator.
+
+On every push to `main` it additionally runs a **real Codex install smoke test**: `npx codex-plugin add boardwalk-labs/plugins --global --yes` against the just-pushed commit (the installer clones the repo's default branch), then asserts each plugin landed with its Codex manifest and a `SKILL.md`. It runs on push rather than on pull requests because `codex-plugin add` installs from a GitHub `org/repo`, so the commit has to be on the remote default branch first (fork-PR branches are not).
+
+Bump the `version` field in every manifest together when you change the shipped payload; the version-sync check fails the build otherwise.

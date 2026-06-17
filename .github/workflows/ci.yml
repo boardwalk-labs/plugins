@@ -7,17 +7,57 @@ on:
 
 jobs:
   layout-check:
-    name: Verify the repo layout matches what each marketplace installer expects
+    name: Verify manifests are well-formed, in sync, and laid out as each installer expects
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
+      - name: All manifest JSON is well-formed
+        # `claude plugin validate` (below) only covers .claude-plugin/*. Without
+        # this, a malformed Cursor / OpenClaw / Codex manifest would ship green.
+        # `jq -e .` exits non-zero on a parse error.
+        run: |
+          set -euo pipefail
+          manifests="
+            .claude-plugin/marketplace.json
+            .claude-plugin/plugin.json
+            .cursor-plugin/plugin.json
+            .agents/plugins/marketplace.json
+            openclaw.plugin.json
+            plugins/boardwalk/.codex-plugin/plugin.json
+          "
+          for f in $manifests; do
+            test -f "$f" || { echo "::error::missing manifest $f"; exit 1; }
+            jq -e . "$f" >/dev/null || { echo "::error::invalid JSON: $f"; exit 1; }
+            echo "ok: $f"
+          done
+
+      - name: Manifest versions are in sync
+        # Every shipped manifest must carry the same version (CONTRIBUTING: bump
+        # them together when the payload changes). .agents/plugins/marketplace.json
+        # carries no version field and is deliberately excluded.
+        run: |
+          set -euo pipefail
+          versions="$(
+            jq -r '.metadata.version, (.plugins[].version)' .claude-plugin/marketplace.json
+            jq -r '.version' .claude-plugin/plugin.json
+            jq -r '.version' .cursor-plugin/plugin.json
+            jq -r '.version' openclaw.plugin.json
+            jq -r '.version' plugins/boardwalk/.codex-plugin/plugin.json
+          )"
+          distinct="$(printf '%s\n' "$versions" | sort -u | grep -c .)"
+          if [ "$distinct" -ne 1 ]; then
+            echo "::error::manifest versions are out of sync (bump them together):"
+            printf '%s\n' "$versions"
+            exit 1
+          fi
+          echo "ok: all manifests at version $(printf '%s\n' "$versions" | head -1)"
+
       - name: Codex marketplace structural check
-        # The `npx codex-plugin add` installer hard-codes
-        # `<repo>/plugins/<plugin-name>/` as the source path it copies into
-        # `~/.codex/plugins/<plugin-name>/`. If we ship without that exact
-        # directory in place, every Codex user gets an ENOENT and the plugin
-        # is unusable until we patch it. This check fails the PR first.
+        # `npx codex-plugin add` clones the repo and copies
+        # `<repo>/plugins/<plugin-name>/` into the Codex plugin dir. If that exact
+        # directory (with its Codex manifest + skills) is missing, every Codex
+        # user gets a broken install. This fails the PR first.
         run: |
           set -euo pipefail
           test -f .agents/plugins/marketplace.json || {
@@ -50,3 +90,35 @@ jobs:
           node-version: '24'
       - run: npm install -g @anthropic-ai/claude-code
       - run: claude plugin validate .
+
+  codex-install-smoke:
+    name: Codex install smoke test (real codex-plugin add)
+    # Runs only on push to main. `codex-plugin add` clones a GitHub org/repo at a
+    # branch/tag (not an arbitrary SHA), so it installs the just-pushed main HEAD
+    # end-to-end with the real installer. PRs — especially from forks — have no
+    # branch on this remote to clone, and are covered by the manifest + layout
+    # checks above.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Install the marketplace with the real installer
+        run: npx -y codex-plugin add boardwalk-labs/plugins --global --yes
+      - name: Assert each plugin installed with its Codex manifest + a skill
+        run: |
+          set -euo pipefail
+          marketplace="$HOME/.agents/plugins/marketplace.json"
+          root="$HOME/.codex/plugins"
+          test -f "$marketplace" || {
+            echo "::error::installer did not write the global marketplace"; exit 1; }
+          for name in $(jq -r '.plugins[].name' "$marketplace"); do
+            test -f "$root/$name/.codex-plugin/plugin.json" || {
+              echo "::error::installed plugin '$name' is missing its Codex manifest"; exit 1; }
+            test -d "$root/$name/skills" || {
+              echo "::error::installed plugin '$name' is missing skills/"; exit 1; }
+            find "$root/$name/skills" -name SKILL.md | grep -q . || {
+              echo "::error::installed plugin '$name' has no SKILL.md"; exit 1; }
+            echo "ok: installed $name"
+          done
