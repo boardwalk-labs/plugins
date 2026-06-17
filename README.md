@@ -2,7 +2,7 @@
 
 Official plugins that let agent harnesses drive the [Boardwalk](https://boardwalk.sh) CLI.
 
-One shared skill set (`use-boardwalk-cli`) packaged for **Claude Code, Codex, Cursor, and OpenClaw**. The skills document the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, and trigger workflows on the user's behalf.
+One shared skill set (`use-boardwalk-cli`) packaged for **Claude Code, Codex, Cursor, and OpenClaw**. The skills document the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, trigger, and operate workflows on the user's behalf.
 
 ## Layout
 
@@ -50,7 +50,7 @@ openclaw plugins install ./
 
 ## What it does
 
-Installs the `use-boardwalk-cli` skill, which gives the model the full `boardwalk` CLI surface: `init`, `dev`, `check`, `login`, `deploy`, `run`, `cancel`, project linking, auth precedence, the run-event channels, and self-hosting knobs. The CLI itself ships separately as [`@boardwalk-labs/cli`](https://www.npmjs.com/package/@boardwalk-labs/cli).
+Installs the `use-boardwalk-cli` skill, which gives the model the `boardwalk` CLI surface: scaffolding (`init`), running locally (`dev`), validating (`check`), bundling (`build`), authenticating, deploying and triggering (`deploy` / `run` / `cancel`), inspecting runs and usage (`runs` / `usage`), and managing workflows, secrets, and inference providers, plus project linking, auth precedence, the run-event channels, and self-hosting knobs. The CLI itself ships separately as [`@boardwalk-labs/cli`](https://www.npmjs.com/package/@boardwalk-labs/cli).
 
 ## License
 
