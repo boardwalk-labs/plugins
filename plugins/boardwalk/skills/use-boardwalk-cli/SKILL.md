@@ -1,6 +1,6 @@
 ---
 name: "use-boardwalk-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A Boardwalk workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest; it calls `agent(prompt)` for LLM work and durable primitives (secrets, sleep, phases, output, artifacts, workflows.call) for everything else. Covers installation, scaffolding (init), running locally (dev), local validation (check), bundling (build), browser OAuth login, deploying, triggering runs, cancelling, inspecting runs and usage, managing workflows/secrets/inference providers, webhook URLs, project linking, auth precedence, the run-event channels, and self-hosting knobs."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A Boardwalk workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest; it calls `agent(prompt)` for LLM work and durable primitives (secrets, sleep, phases, output, artifacts, workflows.call) for everything else. Covers installation, scaffolding (init), running locally (dev), local validation (check), bundling (build), browser OAuth login, deploying, triggering runs, cancelling, inspecting runs and usage, managing workflows/secrets/inference providers, browsing the managed model catalog (models), webhook URLs, project linking, auth precedence, the run-event channels, and self-hosting knobs."
 allowed-tools: Bash
 ---
 
@@ -12,7 +12,7 @@ Use this skill whenever the user needs to install, configure, or drive the first
 
 A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`) — or a package directory containing one. The program exports a pure-literal `meta` object that the platform compiles to the **manifest** (the control-plane contract: slug, optional title, triggers, runtime). The program body does the work:
 
-- `agent(prompt, opts?)` runs an LLM loop. **`model` is optional and chosen per call:** omit it to use Boardwalk's managed inference lane, or name one (e.g. `anthropic/claude-sonnet-4.5`) to pin it. `provider` is optional too — it defaults to the managed `boardwalk` lane; name your own (a built-in vendor or a configured provider) to use BYO keys. The workflow itself declares **no** model or provider.
+- `agent(prompt, opts?)` runs an LLM loop. **`model` is optional and chosen per call:** omit it to use Boardwalk's managed inference lane, or name one (e.g. `anthropic/claude-sonnet-4.5`) to pin it. `provider` is optional too — it defaults to the managed `boardwalk` lane; name your own (a built-in vendor or a configured provider) to use BYO keys. An optional `reasoning` (an effort level from `none` to `xhigh`, or a reasoning-token budget) controls how hard the model thinks before answering. The workflow itself declares **no** model or provider.
 - Durable primitives — `secrets.get`, `sleep`, phases, `output`, `artifacts.write`, `workflows.call` — run in deterministic code. Secrets never reach the LLM context.
 
 There is no YAML and no DSL: the program file *is* the source of truth, and `meta` is a derived projection of it.
@@ -54,6 +54,7 @@ boardwalk dev ./index.ts --verbose                   # stream EVERY channel (age
 boardwalk dev ./index.ts --stream output | jq        # just the result — pipe-friendly
 boardwalk dev ./index.ts --stream phase,log
 boardwalk dev ./index.ts --org my-team               # org to bill managed inference to
+boardwalk dev ./index.ts --token bwk_xxx             # mint the inference key with this bearer (CI/headless)
 ```
 
 `dev` derives and validates the manifest (precise errors before anything runs), bundles the program, executes it in-process, and streams the run-event log. Secrets resolve from `.env` (or `--env <path>`) and their **values never print**.
@@ -187,13 +188,24 @@ boardwalk inference delete my-openai --yes
 
 `--source` is required: `bedrock`, `anthropic`, `google`, `openai`, `openai_compatible`, or `azure_openai` (plus `--base-url`, `--region`, `--api-version`, `--api-key` as the source needs). The name is what an `agent({ provider })` call routes to. Adding or deleting needs `--scopes admin`.
 
+### `boardwalk models` — browse the managed model catalog
+
+```bash
+boardwalk models                                  # the managed lane's most-capable models, with prices
+boardwalk models --all                            # every supported model
+boardwalk models --search claude                  # filter by id or display name
+boardwalk models show anthropic/claude-opus-4.8   # one model's price, context window, support
+```
+
+The catalog is the set of models an `agent({ model })` call can name on the managed lane (no key of yours needed). It is read-only and needs no elevated login. Add `--json` to any of these to pipe the raw record.
+
 ## Project linking (the `--org` flag becomes optional)
 
 The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/project.json` (`{ orgSlug, workflowId }`) and adds `.boardwalk/` to `.gitignore`. Once a directory is linked, `--org` is optional and subsequent commands target the same workflow — a Vercel-style, rename-safe project identity. Deploy each separate project from its own directory so the links don't clobber each other.
 
 ## Auth precedence
 
-For commands that talk to Boardwalk (`deploy`, `run`, `cancel`, `runs`, `usage`, `workflows`, `webhook`, `secrets`, `inference`, …), credentials resolve in this order:
+For commands that talk to Boardwalk (`deploy`, `run`, `cancel`, `runs`, `usage`, `workflows`, `webhook`, `secrets`, `inference`, `models`, …), credentials resolve in this order:
 
 1. `--token <token>` (per-command Bearer token)
 2. `BOARDWALK_API_KEY` environment variable
@@ -236,3 +248,4 @@ BOARDWALK_API_DOMAIN=boardwalk.your-company.com boardwalk login
 | `boardwalk webhook <id\|slug> [--rotate]` | Show / rotate a workflow's inbound webhook URL |
 | `boardwalk secrets [list\|set\|delete] …` | Manage the org's secrets (admin to write) |
 | `boardwalk inference [list\|add\|delete] …` | Manage BYO inference providers (admin to write) |
+| `boardwalk models [list\|show] …` | Browse the managed model catalog for `agent()` |
