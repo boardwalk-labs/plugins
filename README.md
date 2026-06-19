@@ -2,7 +2,7 @@
 
 Official plugins that let agent harnesses drive the [Boardwalk](https://boardwalk.sh) CLI.
 
-One shared skill set (`use-boardwalk-cli`) packaged for **Claude Code, Codex, Cursor, and OpenClaw**. The skills document the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, trigger, and operate workflows on the user's behalf.
+One shared skill set (`use-boardwalk-cli`) packaged for **Claude Code, Codex, Cursor, OpenClaw, and OpenCode**. The skills document the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, trigger, and operate workflows on the user's behalf.
 
 ## Layout
 
@@ -15,7 +15,9 @@ The canonical plugin payload (skills + Codex manifest) lives under `plugins/boar
 - `plugins/boardwalk/.codex-plugin/` — Codex plugin manifest
 - `plugins/boardwalk/skills/` — shared skill definitions (all harnesses point here)
 
-The skills are single-source-of-truth: a change lands in all four plugins at once, with no copy step.
+OpenCode needs no manifest: it loads Agent Skills natively and reads the same `plugins/boardwalk/skills/` folder directly (see [OpenCode](#opencode) under Install).
+
+The skills are single-source-of-truth: a change lands in every harness at once, with no copy step.
 
 ## Install
 
@@ -47,6 +49,18 @@ ln -s "$(pwd)" ~/.cursor/plugins/local/boardwalk
 ```bash
 openclaw plugins install ./
 ```
+
+### OpenCode
+
+OpenCode loads Agent Skills natively, so it reads the same skill with no plugin to install. From a checkout of this repo, link the skill into OpenCode's skills directory:
+
+```bash
+mkdir -p ~/.config/opencode/skills
+ln -s "$(pwd)/plugins/boardwalk/skills/use-boardwalk-cli" \
+  ~/.config/opencode/skills/use-boardwalk-cli
+```
+
+If you already installed the Claude Code plugin, OpenCode also discovers skills under `~/.claude/skills/`, so the Boardwalk skill is available there with no extra step.
 
 ## What it does
 

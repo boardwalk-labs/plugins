@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve the Boardwalk plugins. This repo ships the same Boardwalk integration to four agent harnesses — Claude Code, Codex, Cursor, and OpenClaw — from a single shared source tree.
+Thanks for helping improve the Boardwalk plugins. This repo ships the same Boardwalk integration to five agent harnesses (Claude Code, Codex, Cursor, OpenClaw, and OpenCode) from a single shared source tree.
 
 ## Repository layout
 
@@ -14,16 +14,18 @@ plugins/                                  # repo root
 ├── openclaw.plugin.json
 └── plugins/boardwalk/                     # canonical plugin payload
     ├── .codex-plugin/plugin.json          # Codex manifest (lives inside the payload so codex-plugin's installer finds it)
-    └── skills/                            # shared skills (consumed by all four harnesses)
+    └── skills/                            # shared skills (consumed by every harness)
         └── use-boardwalk-cli/SKILL.md
 ```
 
-The Codex marketplace installer (`npx codex-plugin add …`) hard-codes `<repo>/plugins/<plugin-name>/` as the source path it copies into `~/.codex/plugins/<plugin-name>/`, so the Codex manifest must live inside `plugins/boardwalk/.codex-plugin/`. The other three harnesses read manifests from the repo root and follow each manifest's `"skills"` field into `./plugins/boardwalk/skills/`. The skills are single-source-of-truth — any change lands in all four plugins at once with no copy step.
+The Codex marketplace installer (`npx codex-plugin add …`) hard-codes `<repo>/plugins/<plugin-name>/` as the source path it copies into `~/.codex/plugins/<plugin-name>/`, so the Codex manifest must live inside `plugins/boardwalk/.codex-plugin/`. The other three manifest-based harnesses read manifests from the repo root and follow each manifest's `"skills"` field into `./plugins/boardwalk/skills/`. The skills are single-source-of-truth: any change lands in every harness at once with no copy step.
+
+OpenCode adds no manifest. It loads Agent Skills natively, so its users point it at the same `plugins/boardwalk/skills/` folder directly (the repo README's Install section covers it). It is therefore not part of the version-sync set the CI checks below enforce.
 
 ## Prerequisites
 
 - Git
-- At least one supported harness installed: Claude Code, Codex, Cursor, or OpenClaw
+- At least one supported harness installed: Claude Code, Codex, Cursor, OpenClaw, or OpenCode
 - Node.js ≥ 24 (only if you want to run the `boardwalk` CLI against your changes)
 
 ## Authoring skills
