@@ -52,7 +52,7 @@ openclaw plugins install ./
 
 ### OpenCode
 
-OpenCode loads Agent Skills natively, so it reads the same skill with no plugin to install. From a checkout of this repo, link the skill into OpenCode's skills directory:
+OpenCode has its own plugin system, but it is a different shape: OpenCode plugins are JavaScript/TypeScript hook modules (custom tools and lifecycle hooks) listed under `plugin` in `opencode.json`, not skill bundles, so the Boardwalk skill does not ship as an OpenCode plugin. Instead OpenCode loads Agent Skills natively and reads the same skill with nothing to install. From a checkout of this repo, link the skill into OpenCode's skills directory:
 
 ```bash
 mkdir -p ~/.config/opencode/skills
