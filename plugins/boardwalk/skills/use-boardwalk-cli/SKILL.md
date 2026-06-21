@@ -17,6 +17,17 @@ A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`) — or 
 
 There is no YAML and no DSL: the program file *is* the source of truth, and `meta` is a derived projection of it.
 
+## Writing an efficient workflow
+
+The model is usually the biggest cost, and a workflow may run on a schedule for months, so author for cost from the start:
+
+- **Match the model to the work; use Auto when unsure.** Pick a small, fast model for routine steps (classify, route, short summaries) and a stronger one for genuinely hard steps. When you are not sure which fits, omit `model` (or pass `model: "auto"`) and the managed lane routes each call to a fitting model, with no routing fee. Raise `reasoning` only where a step needs careful multi-step thinking.
+- **Scope each `agent()` leaf.** A judge or classifier needs no tools and one answer: pass `builtins: "none"` plus a `schema`; use `builtins: "read-only"` for analysis. Fewer tools mean a smaller prompt and fewer stray turns. Do parsing, filtering, deduping, and routing in plain code, not another `agent()` call.
+- **Prompt caching is automatic on the managed lane** for the stable front of a prompt, and pays off across the turns of one `agent()` tool-use loop (the prefix is re-read cheaply). Keep instructions and shared context at the front and stable; put the part that varies (the item, the latest message, the file) last. Never bake anything that changes each run (a timestamp, a random id) into the instructions, or the cache never hits. A one-shot call (no tools, no follow-up turn) does not cache, so just make it cheap; when many items share a big context, prefer one agent loop over many separate one-shot calls.
+- **Parallelize** independent work with `parallel([...])` (same tokens, finished sooner). Multi-agent patterns (fan-out and judge, adversarial verify, tournament, loop-until-done) spend N times the tokens, so reach for them when a task is large, parallel, or adversarial, and use a single `agent()` call otherwise.
+- **Don't pay to wait.** Use `sleep` instead of a polling loop; a long sleep releases the machine and resumes later, so idle time is free.
+- **Guardrails.** Always set `budget.max_usd`; keep the default machine unless a step is CPU- or memory-bound; use `workspace: { persist: … }` to reuse expensive setup (a clone, an index) across runs; put must-not-repeat work behind `workflows.call` so a restart re-attaches instead of redoing it.
+
 ## Installation
 
 Requires **Node.js ≥ 24**.
