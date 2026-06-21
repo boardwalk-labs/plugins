@@ -1,6 +1,6 @@
 ---
 name: "use-boardwalk-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A Boardwalk workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest; it calls `agent(prompt)` for LLM work and durable primitives (secrets, sleep, phases, output, artifacts, workflows.call) for everything else. Covers installation, scaffolding (init), running locally (dev), local validation (check), bundling (build), browser OAuth login, deploying, triggering runs, cancelling, inspecting runs and usage, managing workflows/secrets/inference providers, browsing the managed model catalog (models), webhook URLs, project linking, auth precedence, the run-event channels, and self-hosting knobs."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A Boardwalk workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest; it calls `agent(prompt)` for LLM work and durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run) for everything else. Covers installation, scaffolding (init), running locally (dev), local validation (check), bundling (build), browser OAuth login, deploying, triggering runs, cancelling, inspecting runs and usage, answering human-in-the-loop inputs (inputs/respond), managing workflows/secrets/inference providers, browsing the managed model catalog (models), webhook URLs, project linking, auth precedence, the run-event channels, and self-hosting knobs."
 allowed-tools: Bash
 ---
 
@@ -13,7 +13,7 @@ Use this skill whenever the user needs to install, configure, or drive the first
 A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`) — or a package directory containing one. The program exports a pure-literal `meta` object that the platform compiles to the **manifest** (the control-plane contract: slug, optional title, triggers, runtime). The program body does the work:
 
 - `agent(prompt, opts?)` runs an LLM loop. **`model` is optional and chosen per call:** omit it to use Boardwalk's managed inference lane, or name one (e.g. `anthropic/claude-sonnet-4.5`) to pin it. `provider` is optional too — it defaults to the managed `boardwalk` lane; name your own (a built-in vendor or a configured provider) to use BYO keys. An optional `reasoning` (an effort level from `none` to `xhigh`, or a reasoning-token budget) controls how hard the model thinks before answering. The workflow itself declares **no** model or provider.
-- Durable primitives — `secrets.get`, `sleep`, phases, `output`, `artifacts.write`, `workflows.call` — run in deterministic code. Secrets never reach the LLM context.
+- Durable primitives — `secrets.get`, `sleep`, phases, `output`, `artifacts.write`, `workflows.call`, `humanInput` (pause for a person to approve/choose/answer), `step.run` (run a side effect once across a resume) — run in deterministic code. Secrets never reach the LLM context.
 
 There is no YAML and no DSL: the program file *is* the source of truth, and `meta` is a derived projection of it.
 
@@ -141,6 +141,20 @@ boardwalk runs <runId> --json               # raw JSON, for piping
 
 Acting on a single run by id needs no `--org` — the run resolves its own org.
 
+### `boardwalk inputs` / `boardwalk respond` — human-in-the-loop
+
+A workflow can call `humanInput()` to pause for a person to approve, choose, or answer. A paused run goes `awaiting_input` and shows up in the org inbox until someone responds; answering resumes it.
+
+```bash
+boardwalk inputs                              # the org-wide inbox of inputs awaiting a response
+boardwalk inputs <runId>                      # just one run's pending inputs
+boardwalk respond <runId> <key> --value "ship it"        # a text / single-choice gate
+boardwalk respond <runId> <key> --values approve,notify  # a multi-select gate
+boardwalk respond <runId> <key> --other "something else" # the open "Other..." entry
+```
+
+The `key` comes from `boardwalk inputs`. A run resumes once every input in its batch is answered.
+
 ### `boardwalk usage` — spend and activity
 
 ```bash
@@ -243,6 +257,8 @@ BOARDWALK_API_DOMAIN=boardwalk.your-company.com boardwalk login
 | `boardwalk run <file\|dir> [--org <slug>] [--input <json>] [--no-wait]` | Deploy + trigger a real run |
 | `boardwalk cancel <runId>` | Cancel a queued or in-flight run |
 | `boardwalk runs [runId] [--logs] [--follow] [--json]` | List runs, show one, or stream its log |
+| `boardwalk inputs [runId] [--json]` | List human-in-the-loop inputs awaiting a response |
+| `boardwalk respond <runId> <key> [--value\|--values\|--other …]` | Answer a pending input, resuming the run |
 | `boardwalk usage [--org <slug>] [--days <n>] [--json]` | Org spend and activity |
 | `boardwalk workflows [list\|show\|disable\|enable\|delete] …` | Inspect and manage workflows |
 | `boardwalk webhook <id\|slug> [--rotate]` | Show / rotate a workflow's inbound webhook URL |
