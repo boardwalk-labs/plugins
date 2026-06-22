@@ -1,12 +1,12 @@
 ---
 name: "use-boardwalk-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A Boardwalk workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest; it calls `agent(prompt)` for LLM work and durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run) for everything else. Covers installation, scaffolding (init), running locally (dev), local validation (check), bundling (build), browser OAuth login, deploying, triggering runs, cancelling, inspecting runs and usage, answering human-in-the-loop inputs (inputs/respond), managing workflows/secrets/inference providers, browsing the managed model catalog (models), webhook URLs, project linking, auth precedence, the run-event channels, and self-hosting knobs."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A Boardwalk workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest; it calls `agent(prompt)` for LLM work and durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run) for everything else. Covers installation, scaffolding (init), running locally (dev), local validation (check), bundling (build), browser OAuth login, deploying, triggering runs, cancelling, inspecting runs and usage, answering human-in-the-loop inputs (inputs/respond), managing workflows/secrets/environments/variables/inference providers, browsing the managed model catalog (models), webhook URLs, project linking, auth precedence, the run-event channels, and self-hosting knobs."
 allowed-tools: Bash
 ---
 
 # Use the Boardwalk CLI
 
-Use this skill whenever the user needs to install, configure, or drive the first-party `boardwalk` CLI — to scaffold a workflow, run it locally, validate it, sign in, deploy it, trigger a run, cancel one, inspect runs and usage, or manage workflows, secrets, and inference providers. This is the canonical reference for the CLI surface.
+Use this skill whenever the user needs to install, configure, or drive the first-party `boardwalk` CLI — to scaffold a workflow, run it locally, validate it, sign in, deploy it, trigger a run, cancel one, inspect runs and usage, or manage workflows, secrets, environments, variables, and inference providers. This is the canonical reference for the CLI surface.
 
 ## What a Boardwalk workflow is
 
@@ -127,7 +127,10 @@ boardwalk deploy ./index.ts --token bwk_xxx           # use this Bearer token fo
 ```bash
 boardwalk run ./index.ts --org my-team --input '{"who":"world"}'
 boardwalk run ./index.ts --org my-team --no-wait      # trigger and exit without waiting
+boardwalk run ./index.ts --org my-team --environment Production   # run against an environment (its secrets + variables)
 ```
+
+`--environment <name>` picks which environment's secrets and variables the run resolves (omit = the org base). See `boardwalk environments` / `boardwalk variables` below.
 
 ### `boardwalk cancel <runId>` — cancel a queued or in-flight run
 
@@ -202,6 +205,23 @@ boardwalk secrets delete GITHUB_TOKEN --yes
 
 Writing or deleting secrets needs `boardwalk login --scopes admin`. `--scope` is `org` (default) or `user`; `--kind` is `api_key` (default), `oauth_token`, `aws_role`, or `mcp_credential`.
 
+### `boardwalk environments` / `boardwalk variables` — environment config (GitHub-Actions style)
+
+The org keeps **secrets** (encrypted credentials, read in code via `secrets.get`) and non-secret **variables** (injected into the run as `process.env`), organized into **environments**. The **organization base** applies to every run; a named **environment** (e.g. `Production`) holds its own secrets + variables. A run **targets one environment** and resolves its config from it, **falling back to the org base** — the same name can hold a different value per environment. Pick the environment per run with `boardwalk run --environment <name>` (omit = the org base); it is NOT a manifest field.
+
+```bash
+boardwalk environments                       # named environments (the org base always applies underneath)
+boardwalk environments create Production
+boardwalk environments delete Production --yes
+
+boardwalk variables                          # non-secret variables — VALUES are shown (they're not secret)
+boardwalk variables set POSTHOG_PROJECT_ID 475542 --environment Production
+boardwalk variables list --environment Production
+boardwalk variables delete REGION --yes
+```
+
+A program reads a variable with `process.env.NAME` and a secret with `await secrets.get("NAME")`. When `process.env.X` is empty at runtime it is a *where-it's-set vs which-environment-the-run-targeted* mismatch — the variable is set in an environment the run didn't target (or only at the base), not a code/parsing bug. Fix by running against that environment (`--environment <name>`), or setting it on the org base so every run gets it. Writing/deleting needs an elevated login; never store a credential as a variable.
+
 ### `boardwalk inference` — manage BYO inference providers
 
 ```bash
@@ -265,7 +285,7 @@ BOARDWALK_API_DOMAIN=boardwalk.your-company.com boardwalk login
 | `boardwalk login [--scopes admin] [--token bwk_…]` | Authenticate (browser OAuth, or store an API key) |
 | `boardwalk whoami` / `boardwalk status` / `boardwalk logout` | Inspect / verify / clear credentials |
 | `boardwalk deploy <file\|dir> [--org <slug>] [--dry-run]` | Create or update a workflow |
-| `boardwalk run <file\|dir> [--org <slug>] [--input <json>] [--no-wait]` | Deploy + trigger a real run |
+| `boardwalk run <file\|dir> [--org <slug>] [--input <json>] [--environment <name>] [--no-wait]` | Deploy + trigger a real run |
 | `boardwalk cancel <runId>` | Cancel a queued or in-flight run |
 | `boardwalk runs [runId] [--logs] [--follow] [--json]` | List runs, show one, or stream its log |
 | `boardwalk inputs [runId] [--json]` | List human-in-the-loop inputs awaiting a response |
@@ -274,5 +294,7 @@ BOARDWALK_API_DOMAIN=boardwalk.your-company.com boardwalk login
 | `boardwalk workflows [list\|show\|disable\|enable\|delete] …` | Inspect and manage workflows |
 | `boardwalk webhook <id\|slug> [--rotate]` | Show / rotate a workflow's inbound webhook URL |
 | `boardwalk secrets [list\|set\|delete] …` | Manage the org's secrets (admin to write) |
+| `boardwalk environments [list\|create\|delete] …` | Manage named environments (config sets a run targets) |
+| `boardwalk variables [list\|set\|delete] [--environment <name>] …` | Manage non-secret variables (`process.env`) |
 | `boardwalk inference [list\|add\|delete] …` | Manage BYO inference providers (admin to write) |
 | `boardwalk models [list\|show] …` | Browse the managed model catalog for `agent()` |
