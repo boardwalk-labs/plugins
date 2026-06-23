@@ -28,6 +28,21 @@ The model is usually the biggest cost, and a workflow may run on a schedule for 
 - **Don't pay to wait.** Use `sleep` instead of a polling loop; a long sleep releases the machine and resumes later, so idle time is free.
 - **Guardrails.** Always set `budget.max_usd`; keep the default machine unless a step is CPU- or memory-bound; use `workspace: { persist: … }` to reuse expensive setup (a clone, an index) across runs; put must-not-repeat work behind `workflows.call` so a restart re-attaches instead of redoing it.
 
+## Make the run legible
+
+A run is a permanent, replayable record, and the program decides how much of its story that record tells. Author for visibility from the start: when you come back to a failed run, the log is all you have to go on.
+
+- **Mark each stage with `phase()`.** `phase("Fetch issues")` names a section of the run on the `phase` channel, so the live tail and `boardwalk runs <id> --logs` read as a sequence of named steps instead of one undifferentiated stream. Set one per logical stage.
+- **Narrate inside a stage with `console.log`.** Plain stdout/stderr lands on the `log` channel. Log the facts that explain the run after the fact: counts, the branch taken and why, ids of things created, the decision a step reached. A run whose log answers "what did this actually do?" is one you can debug without re-running it.
+- **The quiet default already tells the story.** The default channel view is `lifecycle` + `phase` + `output`, so well-named phases make a run readable at a glance; `--verbose` / `--stream log` adds the `console.log` detail on demand. So set phases generously and log at each boundary and decision.
+- **Never `console.log` a secret value.** The `log` channel is persisted with the run. Secrets are redacted from the *model's* context, not from your own stdout, so keep credentials out of log lines.
+
+```ts
+phase("Triage");
+const urgent = issues.filter(isUrgent);
+console.log(`${urgent.length} of ${issues.length} need attention`);
+```
+
 ## Installation
 
 Requires **Node.js ≥ 24**.
