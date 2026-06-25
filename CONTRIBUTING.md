@@ -15,7 +15,8 @@ plugins/                                  # repo root
 └── plugins/boardwalk/                     # canonical plugin payload
     ├── .codex-plugin/plugin.json          # Codex manifest (lives inside the payload so codex-plugin's installer finds it)
     └── skills/                            # shared skills (consumed by every harness)
-        └── use-boardwalk-cli/SKILL.md
+        ├── use-boardwalk-cli/SKILL.md
+        └── write-good-loops/SKILL.md
 ```
 
 The Codex marketplace installer (`npx codex-plugin add …`) hard-codes `<repo>/plugins/<plugin-name>/` as the source path it copies into `~/.codex/plugins/<plugin-name>/`, so the Codex manifest must live inside `plugins/boardwalk/.codex-plugin/`. The other three manifest-based harnesses read manifests from the repo root and follow each manifest's `"skills"` field into `./plugins/boardwalk/skills/`. The skills are single-source-of-truth: any change lands in every harness at once with no copy step.

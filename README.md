@@ -2,7 +2,7 @@
 
 Official plugins that let agent harnesses drive the [Boardwalk](https://boardwalk.sh) CLI.
 
-One shared skill set (`use-boardwalk-cli`) packaged for **Claude Code, Codex, Cursor, OpenClaw, and OpenCode**. The skills document the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, trigger, and operate workflows on the user's behalf.
+Two shared skills (`use-boardwalk-cli` and `write-good-loops`) packaged for **Claude Code, Codex, Cursor, OpenClaw, and OpenCode**. `use-boardwalk-cli` documents the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, trigger, and operate workflows on the user's behalf; `write-good-loops` teaches how to author an agent loop that iterates until a goal is reached (layered exits, bounded-vs-recurring topology, maker/checker verification, durable state).
 
 ## Layout
 
@@ -64,7 +64,7 @@ If you already installed the Claude Code plugin, OpenCode also discovers skills 
 
 ## What it does
 
-Installs the `use-boardwalk-cli` skill, which gives the model the `boardwalk` CLI surface: scaffolding (`init`), running locally (`dev`), validating (`check`), bundling (`build`), authenticating, deploying and triggering (`deploy` / `run` / `cancel`), inspecting runs and usage (`runs` / `usage`), and managing workflows, secrets, environments, variables, and inference providers, plus project linking, auth precedence, the run-event channels, and self-hosting knobs. The CLI itself ships separately as [`@boardwalk-labs/cli`](https://www.npmjs.com/package/@boardwalk-labs/cli).
+Installs two skills. `use-boardwalk-cli` gives the model the `boardwalk` CLI surface: scaffolding (`init`), running locally (`dev`), validating (`check`), bundling (`build`), authenticating, deploying and triggering (`deploy` / `run` / `cancel`), inspecting runs and usage (`runs` / `usage`), and managing workflows, secrets, environments, variables, and inference providers, plus project linking, auth precedence, the run-event channels, and self-hosting knobs. `write-good-loops` teaches the model to author an agent loop that iterates until a goal is reached: the core loop shape, the layered exits every loop needs (verifier, iteration cap, budget, no-progress), bounded-vs-recurring topology, maker/checker verification, durable cross-run state, and not paying to wait. The CLI itself ships separately as [`@boardwalk-labs/cli`](https://www.npmjs.com/package/@boardwalk-labs/cli).
 
 ## License
 
