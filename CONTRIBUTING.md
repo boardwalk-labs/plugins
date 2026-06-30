@@ -15,7 +15,7 @@ plugins/                                  # repo root
 └── plugins/boardwalk/                     # canonical plugin payload
     ├── .codex-plugin/plugin.json          # Codex manifest (lives inside the payload so codex-plugin's installer finds it)
     └── skills/                            # shared skills (consumed by every harness)
-        ├── use-boardwalk-cli/SKILL.md
+        ├── boardwalk-use-cli/SKILL.md
         └── write-good-loops/SKILL.md
 ```
 

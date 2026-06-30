@@ -1,6 +1,6 @@
 ---
 name: "write-good-loops"
-description: "Use when a user wants to build an agent LOOP in Boardwalk — a workflow that iterates until a goal is reached rather than running once. Covers find/fix/verify loops, poll-until-healthy, drain-a-queue, and run-on-a-schedule maintainers. Teaches the core loop shape (plain control flow over agent()), the layered exits every loop needs (a verifier, a hard iteration cap, a budget, no-progress detection), choosing the topology (one long run with while+sleep vs a recurring cron trigger of many short runs vs workflows.schedule for runtime-computed cadences), splitting the maker from the checker for verification, carrying durable state across runs, and never paying for idle wait. Pairs with use-boardwalk-cli for scaffolding, validating (boardwalk check), and running the loop."
+description: "Use when a user wants to build an agent LOOP in Boardwalk — a workflow that iterates until a goal is reached rather than running once. Covers find/fix/verify loops, poll-until-healthy, drain-a-queue, and run-on-a-schedule maintainers. Teaches the core loop shape (plain control flow over agent()), the layered exits every loop needs (a verifier, a hard iteration cap, a budget, no-progress detection), choosing the topology (one long run with while+sleep vs a recurring cron trigger of many short runs vs workflows.schedule for runtime-computed cadences), splitting the maker from the checker for verification, carrying durable state across runs, and never paying for idle wait. Pairs with boardwalk-use-cli for scaffolding, validating (boardwalk check), and running the loop."
 allowed-tools: Read, Write, Edit, Bash
 ---
 
@@ -11,7 +11,7 @@ running a single prompt: find every bug in a diff, drain a queue, watch a servic
 healthy, or maintain a repo every night. A loop is how you hand the whole find → act → check → repeat
 cycle to the workflow, so the user defines the goal once instead of re-prompting each step.
 
-A Boardwalk workflow is a TypeScript/JavaScript program file (see `use-boardwalk-cli` for what a
+A Boardwalk workflow is a TypeScript/JavaScript program file (see `boardwalk-use-cli` for what a
 workflow is and how to scaffold/validate/run one). A loop is **not** a platform feature you
 configure — it's ordinary control flow in that program. So the whole skill is about writing that
 control flow well: giving it exits, shaping it right, verifying its output, and carrying state.
@@ -177,7 +177,7 @@ if (ok.value === "approve") await workflows.call("open-pr", { /* ... */ });
 
 ## Build and ship it
 
-Use the `boardwalk` CLI (see `use-boardwalk-cli`):
+Use the `boardwalk` CLI (see `boardwalk-use-cli`):
 
 ```bash
 boardwalk check .                                   # validate the program (no auth/network)

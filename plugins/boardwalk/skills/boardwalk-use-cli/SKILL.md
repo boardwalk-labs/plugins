@@ -1,5 +1,5 @@
 ---
-name: "use-boardwalk-cli"
+name: "boardwalk-use-cli"
 description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A Boardwalk workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest; it calls `agent(prompt)` for LLM work and durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run) for everything else. Covers installation, scaffolding (init), running locally (dev), local validation (check), bundling (build), browser OAuth login, deploying, triggering runs, cancelling, inspecting runs and usage, answering human-in-the-loop inputs (inputs/respond), managing workflows/secrets/environments/variables/inference providers, browsing the managed model catalog (models), webhook URLs, project linking, auth precedence, the run-event channels, and self-hosting knobs."
 allowed-tools: Bash
 ---
