@@ -12,8 +12,8 @@ healthy, or maintain a repo every night. A loop is how you hand the whole find â
 cycle to the workflow, so the user defines the goal once instead of re-prompting each step.
 
 A Boardwalk workflow is a TypeScript/JavaScript program file (new to Boardwalk? see
-`boardwalk-overview` for the mental model, and `boardwalk-use-cli` for how to scaffold/validate/run
-one). A loop is **not** a platform feature you
+`boardwalk-overview` for the mental model, `write-good-workflows` for the general authoring craft, and
+`boardwalk-use-cli` for how to scaffold/validate/run one). A loop is **not** a platform feature you
 configure; it's ordinary control flow in that program. So the whole skill is about writing that
 control flow well: giving it exits, shaping it right, verifying its output, and carrying state.
 

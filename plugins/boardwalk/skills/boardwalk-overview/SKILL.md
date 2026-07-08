@@ -102,10 +102,14 @@ via `agent()`, not you (the coding agent reading this) and not a Claude Code sub
 
 ## Where to go next
 
-- To scaffold, run, validate, deploy, trigger, or inspect a workflow, and for every `boardwalk`
-  command (secrets, environments, inference providers, self-hosted runners): use **`boardwalk-use-cli`**.
+- To author a workflow well (match the model, keep it legible, guardrails, determinism): use
+  **`write-good-workflows`**.
 - To build a workflow that iterates until a goal is reached (find/fix/verify, drain a queue, poll
   until healthy, a nightly maintainer): use **`write-good-loops`**.
+- To give an `agent()` skills, tools, MCP servers, or memory, and structure a multi-file package: use
+  **`equip-agents`**.
+- To scaffold, run, validate, deploy, trigger, or inspect a workflow, and for every `boardwalk`
+  command (secrets, environments, inference providers, self-hosted runners): use **`boardwalk-use-cli`**.
 
 The full authoring contract (every primitive, the manifest fields, the run-event format) is in the
 `@boardwalk-labs/workflow` package's `SPEC.md`.
