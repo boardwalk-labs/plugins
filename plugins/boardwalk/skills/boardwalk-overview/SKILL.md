@@ -45,6 +45,11 @@ output(summary);
   any import and any npm dependency work, and `output(value)` declares the result. Trigger input
   arrives as the `input` global.
 
+A workflow can also be a **package**: a directory the CLI bundles as one unit, with an entry `index.ts`,
+helper modules it imports, and a `skills/` folder or other assets. Point the CLI at the directory
+instead of the file. This is what lets an `agent()` load reusable skills and resources. See the
+`equip-agents` skill.
+
 ## How the pieces fit
 
 - **`agent(prompt, opts?)` is the LLM step.** It runs an agent loop (a model plus its tools) and
@@ -58,6 +63,8 @@ output(summary);
   `output`, `artifacts.write`, `workflows.call` (invoke another workflow), `humanInput` (pause for a
   person), `step.run` (run a side effect once across a resume), and the durable `now()`, `random()`,
   `uuid()`. `parallel([...])` runs independent work at once.
+- **Each `agent()` can be equipped per call**, on top of the default built-in tools, with reusable
+  `skills`, inline `tools`, `mcp` servers, and persistent `memory`. See the `equip-agents` skill.
 
 ## Where a workflow runs
 
