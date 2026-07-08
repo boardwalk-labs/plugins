@@ -1,6 +1,6 @@
 ---
 name: "write-good-loops"
-description: "Use when a user wants to build an agent LOOP in Boardwalk — a workflow that iterates until a goal is reached rather than running once. Covers find/fix/verify loops, poll-until-healthy, drain-a-queue, and run-on-a-schedule maintainers. Teaches the core loop shape (plain control flow over agent()), the layered exits every loop needs (a verifier, a hard iteration cap, a budget, no-progress detection), choosing the topology (one long run with while+sleep vs a recurring cron trigger of many short runs vs workflows.schedule for runtime-computed cadences), splitting the maker from the checker for verification, carrying durable state across runs, and never paying for idle wait. Pairs with boardwalk-use-cli for scaffolding, validating (boardwalk check), and running the loop."
+description: "Use when a user wants to build an agent LOOP in Boardwalk, a workflow that iterates until a goal is reached rather than running once. Covers find/fix/verify loops, poll-until-healthy, drain-a-queue, and run-on-a-schedule maintainers. Teaches the core loop shape (plain control flow over agent()), the layered exits every loop needs (a verifier, a hard iteration cap, a budget, no-progress detection), choosing the topology (one long run with while+sleep vs a recurring cron trigger of many short runs vs workflows.schedule for runtime-computed cadences), splitting the maker from the checker for verification, carrying durable state across runs, and never paying for idle wait. Pairs with boardwalk-use-cli for scaffolding, validating (boardwalk check), and running the loop."
 allowed-tools: Read, Write, Edit, Bash
 ---
 
@@ -14,7 +14,7 @@ cycle to the workflow, so the user defines the goal once instead of re-prompting
 A Boardwalk workflow is a TypeScript/JavaScript program file (new to Boardwalk? see
 `boardwalk-overview` for the mental model, and `boardwalk-use-cli` for how to scaffold/validate/run
 one). A loop is **not** a platform feature you
-configure — it's ordinary control flow in that program. So the whole skill is about writing that
+configure; it's ordinary control flow in that program. So the whole skill is about writing that
 control flow well: giving it exits, shaping it right, verifying its output, and carrying state.
 
 ## The core shape
@@ -63,16 +63,16 @@ you can leave running.
 
 ## Always give a loop exits
 
-A loop with no explicit stopping logic is the single most expensive mistake — it runs until the
+A loop with no explicit stopping logic is the single most expensive mistake: it runs until the
 budget is gone. Don't rely on one exit; **layer** them so no single failure runs the loop away:
 
-1. **A goal check** — the loop ends when the work is genuinely done, confirmed by a *separate*
+1. **A goal check**: the loop ends when the work is genuinely done, confirmed by a *separate*
    verifier (next section), not by the agent grading itself.
-2. **A hard iteration cap** — a plain `round < maxRounds` bound, so a non-converging loop still
+2. **A hard iteration cap**: a plain `round < maxRounds` bound, so a non-converging loop still
    terminates.
-3. **A budget** — set `budget.max_usd` (and `max_duration_seconds`) in `meta`. Breaching a budget
+3. **A budget**: set `budget.max_usd` (and `max_duration_seconds`) in `meta`. Breaching a budget
    *terminates* the run; it doesn't truncate silently.
-4. **No-progress detection** — if a round adds nothing new, count it and bail after a few in a row. A
+4. **No-progress detection**: if a round adds nothing new, count it and bail after a few in a row. A
    loop confidently spinning in place is worse than one that stops.
 
 ```ts
@@ -109,14 +109,14 @@ export const meta = {
 
 For a **fixed** cadence, the `cron` trigger in `meta` is all you need. Reach for
 `workflows.schedule(slug, input, { cron })` (or `{ rate }` / `{ at }`) **only** when the schedule is
-computed at runtime, or one workflow schedules another — it's the dynamic version of the same
+computed at runtime, or one workflow schedules another. It is the dynamic version of the same
 pipeline, not a different one.
 
 ## Split the maker from the checker
 
 An agent that decides its own work is done is goal drift in one sentence. The biggest reliability win
 when looping toward a goal is to verify with a **separate** agent, prompted to *refute* rather than to
-agree — only what survives the check counts.
+agree. Only what survives the check counts.
 
 ```ts
 phase("Verify");
@@ -131,7 +131,7 @@ best-practice nice-to-have? Default to real:false if unsure.\nClaim: ${c.title}\
 const confirmed = candidates.filter((_, i) => verdicts[i].real);
 ```
 
-Verification re-reads the work once per item, so it roughly **doubles** the loop's tokens — the right
+Verification re-reads the work once per item, so it roughly **doubles** the loop's tokens: the right
 trade on output you can't afford to get wrong, skippable on low-stakes work. Keep the material compact
 or batch several items per checker call when that cost grows. (Run the checks with `parallel([...])`
 so they don't serialize.)
@@ -153,12 +153,12 @@ writeFileSync(donePath, JSON.stringify(done));
 
 Persisted state is **last-writer-wins**, so pin `concurrency: { mode: "serial" }` whenever a loop
 shares it. For work that must never be redone on a restart, put it behind `workflows.call(slug,
-input)` — a restarted parent re-attaches to the existing child result instead of running it again.
+input)`: a restarted parent re-attaches to the existing child result instead of running it again.
 
 ## Don't pay to wait
 
 Loops wait a lot: between polls, for a build, for a person. Never busy-wait. A long `sleep` **releases
-the machine** and re-acquires one on wake, and a human gate does the same — idle time isn't billed, so
+the machine** and re-acquires one on wake, and a human gate does the same. Idle time isn't billed, so
 a loop can park overnight on an approval or poll for a week and cost nothing in between.
 
 ```ts
@@ -166,7 +166,7 @@ import { sleep, humanInput } from "@boardwalk-labs/workflow";
 
 for (;;) {
   if (await isHealthy(url)) break;
-  await sleep("5m");                  // releases the machine; resumes in 5m, idle free
+  await sleep(5 * 60 * 1000);         // 5 min; releases the machine, resumes later, idle free
 }
 
 const ok = await humanInput({         // run suspends until a person answers; not billed waiting
@@ -182,7 +182,7 @@ Use the `boardwalk` CLI (see `boardwalk-use-cli`):
 
 ```bash
 boardwalk check .                                   # validate the program (no auth/network)
-boardwalk run . --org <slug> --input '{"text":"…"}' # deploy + trigger + wait
+boardwalk run . --org <slug> --input '{"text":"..."}' # deploy + trigger + wait
 boardwalk runs <id> --logs                          # read what each round did
 ```
 
@@ -195,9 +195,9 @@ loop) and `--template loop-with-verify` (the same loop plus the separate checker
       no-progress detection. Never just one.
 - [ ] **Topology matches the job:** one run for a bounded goal; a `cron` trigger for an open-ended
       cadence; `workflows.schedule` only for a runtime-computed schedule.
-- [ ] **The checker is a separate agent**, prompted to refute — the maker never grades itself.
+- [ ] **The checker is a separate agent**, prompted to refute; the maker never grades itself.
 - [ ] **Dedupe and route in code**, not in another `agent()` call.
 - [ ] **Recurring loops persist state** (`workspace: { persist: true }` + `concurrency: serial`) or
       re-derive it from the source of truth.
-- [ ] **Waits use `sleep`/`humanInput`**, never a busy-wait — idle time should be free.
+- [ ] **Waits use `sleep`/`humanInput`**, never a busy-wait; idle time should be free.
 - [ ] **Secrets stay in code** (`secrets.get`), never in an agent prompt.
