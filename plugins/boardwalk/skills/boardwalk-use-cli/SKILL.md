@@ -8,6 +8,8 @@ allowed-tools: Bash
 
 Use this skill whenever the user needs to install, configure, or drive the first-party `boardwalk` CLI — to scaffold a workflow, run it locally, validate it, sign in, deploy it, trigger a run, cancel one, inspect runs and usage, or manage workflows, secrets, environments, variables, and inference providers. This is the canonical reference for the CLI surface.
 
+New to Boardwalk? Read the **`boardwalk-overview`** skill first — it covers what the platform is and the workflow mental model (a workflow is a TypeScript program, not YAML), which this reference assumes you already have.
+
 ## What a Boardwalk workflow is
 
 A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`) — or a package directory containing one. The program exports a pure-literal `meta` object that the platform compiles to the **manifest** (the control-plane contract: slug, optional title, triggers, runtime). The program body does the work:
