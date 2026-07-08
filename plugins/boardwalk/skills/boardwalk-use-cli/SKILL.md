@@ -1,6 +1,6 @@
 ---
 name: "boardwalk-use-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI — the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run, now/random/uuid). Covers install, scaffolding (init), local run (dev) and validation (check, including the determinism gate), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), project linking, auth precedence, and run-event channels."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run, now/random/uuid). Covers install, scaffolding (init), local run (dev) and validation (check, including the determinism gate), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), project linking, auth precedence, and run-event channels."
 allowed-tools: Bash
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Bash
 
 Use this skill whenever the user needs to install, configure, or drive the first-party `boardwalk` CLI — to scaffold a workflow, run it locally, validate it, sign in, deploy it, trigger a run, cancel one, inspect runs and usage, or manage workflows, secrets, environments, variables, and inference providers. This is the canonical reference for the CLI surface.
 
-New to Boardwalk? Read the **`boardwalk-overview`** skill first — it covers what the platform is and the workflow mental model (a workflow is a TypeScript program, not YAML), which this reference assumes you already have.
+New to Boardwalk? Read the **`boardwalk-overview`** skill first. It covers what the platform is and the workflow mental model (a workflow is a TypeScript program, not YAML), which this reference assumes you already have.
 
 ## What a Boardwalk workflow is
 
@@ -19,7 +19,7 @@ A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`) — or 
 
 There is no YAML and no DSL: the program file *is* the source of truth, and `meta` is a derived projection of it.
 
-**The program must be deterministic across a restart.** A run restarts from the top on a crash and replays from the top on a resume (after a `sleep` or `humanInput`), so a value that changes on the second pass silently corrupts the run. Bare `Date.now()`, `new Date()`, `performance.now()`, `Math.random()`, and `crypto.randomUUID()`/`getRandomValues()` are therefore **blocked** — use the SDK's durable `await now()`, `await random()`, and `await uuid()`, which record their result once and return the same value on replay. `check`, `deploy`, and `run` enforce this gate (`build`/`dev` only warn); `--allow-nondeterminism` overrides it. Raw I/O like bare `fetch` is advisory-only — legitimate in a non-suspending script — but wrap it in `step.run` if it precedes a `sleep`, so a resume doesn't re-fire it.
+**The program must be deterministic across a restart.** A run restarts from the top on a crash and replays from the top on a resume (after a `sleep` or `humanInput`), so a value that changes on the second pass silently corrupts the run. Bare `Date.now()`, `new Date()`, `performance.now()`, `Math.random()`, and `crypto.randomUUID()`/`getRandomValues()` are therefore **blocked**. Use the SDK's durable `await now()`, `await random()`, and `await uuid()`, which record their result once and return the same value on replay. `check`, `deploy`, and `run` enforce this gate (`build`/`dev` only warn); `--allow-nondeterminism` overrides it. Raw I/O like bare `fetch` is advisory-only (legitimate in a non-suspending script), but wrap it in `step.run` if it precedes a `sleep`, so a resume doesn't re-fire it.
 
 ## Writing an efficient workflow
 
@@ -100,7 +100,7 @@ boardwalk check ./index.ts
 boardwalk check ./index.ts --allow-nondeterminism   # downgrade the determinism gate to a warning
 ```
 
-Everything `dev` validates, without executing: full manifest-schema validation (the same schema every engine enforces), an esbuild compile proving every import resolves, **and the determinism gate** — a blocking error on bare `Date.now()`/`Math.random()`/`crypto.randomUUID()` and friends (fix with `now()`/`random()`/`uuid()`, or pass `--allow-nondeterminism`). No auth, no network — safe in CI on every commit. `deploy` and `run` run the same gate; `build` and `dev` print the warnings without blocking.
+Everything `dev` validates, without executing: full manifest-schema validation (the same schema every engine enforces), an esbuild compile proving every import resolves, **and the determinism gate**, a blocking error on bare `Date.now()`/`Math.random()`/`crypto.randomUUID()` and friends (fix with `now()`/`random()`/`uuid()`, or pass `--allow-nondeterminism`). No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same gate; `build` and `dev` print the warnings without blocking.
 
 ### `boardwalk build <file|dir>` — bundle to one deployable file
 
@@ -213,7 +213,7 @@ boardwalk webhook <id|slug>                 # show the inbound URL + verificatio
 boardwalk webhook <id|slug> --rotate        # regenerate the secret and reveal it ONCE (admin)
 ```
 
-The **secret is never in the URL** — the URL is the bare workflow endpoint, safe to share. The secret rides in a header per the trigger's verifier preset: `token` sends it verbatim in `X-Boardwalk-Token`, `custom_header` in a caller-named header, `signature` as an HMAC-SHA256 of the raw body in `X-Boardwalk-Signature: sha256=<hex>`, and the provider presets (`github`/`stripe`/`slack`/`linear`) verify that provider's own signing scheme. Plain `webhook <ref>` prints the endpoint and scheme but no secret; `--rotate` (admin-gated) mints a new secret, invalidates the old one, and reveals the new value a single time — reconfigure the sender afterward. A workflow gets a webhook by declaring `{ kind: "webhook", auth: "token" }` (or another preset) in `meta.triggers`.
+The **secret is never in the URL**. The URL is the bare workflow endpoint, safe to share. The secret rides in a header per the trigger's verifier preset: `token` sends it verbatim in `X-Boardwalk-Token`, `custom_header` in a caller-named header, `signature` as an HMAC-SHA256 of the raw body in `X-Boardwalk-Signature: sha256=<hex>`, and the provider presets (`github`/`stripe`/`slack`/`linear`) verify that provider's own signing scheme. Plain `webhook <ref>` prints the endpoint and scheme but no secret; `--rotate` (admin-gated) mints a new secret, invalidates the old one, and reveals the new value a single time, so reconfigure the sender afterward. A workflow gets a webhook by declaring `{ kind: "webhook", auth: "token" }` (or another preset) in `meta.triggers`.
 
 ### `boardwalk secrets` — manage the org's secrets (values never returned)
 
@@ -268,7 +268,7 @@ The catalog is the set of models an `agent({ model })` call can name on the mana
 
 ## Run on your own machine (`boardwalk runner`)
 
-Besides the hosted fleet, a workflow can run on **your own hardware** — for a workflow that needs your network, a private toolchain, or a machine the hosted runners can't reach. `boardwalk runner` turns the current machine into a self-hosted runner that claims runs from the org's pool. A workflow opts in by declaring `runs_on: { kind: "self-hosted" }` in `meta` (with an optional `pool` and `labels`); everything else about the workflow is unchanged.
+Besides the hosted fleet, a workflow can run on **your own hardware**, for a workflow that needs your network, a private toolchain, or a machine the hosted runners can't reach. `boardwalk runner` turns the current machine into a self-hosted runner that claims runs from the org's pool. A workflow opts in by declaring `runs_on: { kind: "self-hosted" }` in `meta` (with an optional `pool` and `labels`); everything else about the workflow is unchanged.
 
 ```bash
 boardwalk runner start --org my-team        # register THIS machine + go online (foreground)
@@ -279,7 +279,7 @@ boardwalk runner list --org my-team         # the org's runners (status, pool, l
 boardwalk runner remove <runnerId> --yes    # deregister (its credential dies immediately)
 ```
 
-`runner start` is the whole happy path: a plain `boardwalk login` with **owner/admin** membership is enough — the CLI registers the machine through the management API (no elevated scopes, no token handling), saves a standing identity under `~/.boardwalk/runner/`, and goes online. Restarts skip registration. **Runs are containerized by default**; `--host` opts out and gives the workflow full access to the machine (only for workflows you trust). **Ctrl-C drains** — the in-flight run finishes and nothing new is claimed.
+`runner start` is the whole happy path: a plain `boardwalk login` with **owner/admin** membership is enough, and the CLI registers the machine through the management API (no elevated scopes, no token handling), saves a standing identity under `~/.boardwalk/runner/`, and goes online. Restarts skip registration. **Runs are containerized by default**; `--host` opts out and gives the workflow full access to the machine (only for workflows you trust). **Ctrl-C drains**: the in-flight run finishes and nothing new is claimed.
 
 For fleets (many machines, no interactive login on each), use the two-step token flow: mint a one-time registration token from an admin machine, then redeem it on each target.
 
