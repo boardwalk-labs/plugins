@@ -5,10 +5,6 @@ description: "Explains what Boardwalk is and how it fits together — the orient
 
 # What Boardwalk is
 
-Read this before you touch the CLI or write any code, if Boardwalk is new to you. It exists because
-a third-party agent lands on the other Boardwalk skills — which are command and pattern reference —
-without knowing what the thing *is*. This skill is the mental model; the other two are how you drive it.
-
 **Boardwalk is a platform for running agent workflows** — programs that call LLMs, and do real work
 around them, **unattended**: on a schedule, on a webhook, or on demand. You (an AI coding agent) author
 the workflow; Boardwalk runs it durably in the cloud (or on the user's own server, or locally) and
@@ -18,9 +14,9 @@ an org builds and runs its agent workflows," not a chatbot and not a drag-and-dr
 
 ## A workflow is a program, not a config
 
-This is the single most important thing to get right, and the one newcomers get wrong: **a Boardwalk
-workflow is a TypeScript/JavaScript file** (or a package directory containing one). There is **no YAML,
-no DSL, and no visual builder** — the program file *is* the source of truth.
+**A Boardwalk workflow is a TypeScript/JavaScript file** (or a package directory containing one) — the
+thing newcomers get wrong. There is **no YAML, no DSL, and no visual builder**; the program file *is*
+the source of truth.
 
 ```ts
 import { agent, output, secrets, type WorkflowMeta } from "@boardwalk-labs/workflow";
@@ -80,7 +76,7 @@ runner** (`runs_on: { kind: "self-hosted" }` in `meta`) — see `boardwalk-use-c
 
 ## Constraints that trip up a newcomer
 
-Correct these before you write code — an agent that doesn't know them ships broken workflows:
+Get these right before writing code:
 
 - **The program must be deterministic across a restart.** A run restarts from the top on a crash and
   replays from the top after a `sleep`/`humanInput`, so a value that changes on the second pass corrupts
