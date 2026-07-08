@@ -1,6 +1,6 @@
 ---
 name: "boardwalk-use-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run, now/random/uuid). Covers install, scaffolding (init), local run (dev) and validation (check, including the determinism gate), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), project linking, auth precedence, and run-event channels."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run, now/random/uuid). Covers install, scaffolding (init), local run (dev) and validation (check, including the determinism gate), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), and project linking."
 allowed-tools: Bash
 ---
 
@@ -12,40 +12,9 @@ New to Boardwalk? Read the **`boardwalk-overview`** skill first. It covers what 
 
 ## What a Boardwalk workflow is
 
-A workflow is a **TypeScript/JavaScript program file** (e.g. `index.ts`), or a package directory containing one. The program exports a pure-literal `meta` object that the platform compiles to the **manifest** (the control-plane contract: slug, optional title, triggers, runtime). The program body does the work:
-
-- `agent(prompt, opts?)` runs an LLM loop. **`model` is optional and chosen per call:** omit it to use Boardwalk's managed inference lane, or name one (e.g. `anthropic/claude-sonnet-4.5`) to pin it. `provider` is optional too: it defaults to the managed `boardwalk` lane; name your own (a built-in vendor or a configured provider) to use BYO keys. An optional `reasoning` (an effort level from `none` to `xhigh`, or a reasoning-token budget) controls how hard the model thinks before answering. The workflow itself declares **no** model or provider.
-- Durable primitives run in deterministic code: `secrets.get`, `sleep`, phases, `output`, `artifacts.write`, `workflows.call`, `humanInput` (pause for a person to approve/choose/answer), and `step.run` (run a side effect once across a resume). Secrets never reach the LLM context.
-
-There is no YAML and no DSL: the program file *is* the source of truth, and `meta` is a derived projection of it.
+A workflow is a **TypeScript/JavaScript program file** (or a package directory), whose pure-literal `meta` compiles to the **manifest** (the control-plane contract). There is no YAML and no DSL. The body calls `agent(prompt)` for LLM work (`model` optional, chosen per call) and durable primitives (`secrets.get`, `sleep`, `output`, `workflows.call`, `humanInput`, `step.run`, and the durable `now`/`random`/`uuid`) for everything else. See `boardwalk-overview` for the full model and `equip-agents` for giving an `agent()` skills, tools, MCP, and memory.
 
 **The program must be deterministic across a restart.** A run restarts from the top on a crash and replays from the top on a resume (after a `sleep` or `humanInput`), so a value that changes on the second pass silently corrupts the run. Bare `Date.now()`, `new Date()`, `performance.now()`, `Math.random()`, and `crypto.randomUUID()`/`getRandomValues()` are therefore **blocked**. Use the SDK's durable `await now()`, `await random()`, and `await uuid()`, which record their result once and return the same value on replay. `check`, `deploy`, and `run` enforce this gate (`build`/`dev` only warn); `--allow-nondeterminism` overrides it. Raw I/O like bare `fetch` is advisory-only (legitimate in a non-suspending script), but wrap it in `step.run` if it precedes a `sleep`, so a resume doesn't re-fire it.
-
-## Writing an efficient workflow
-
-The model is usually the biggest cost, and a workflow may run on a schedule for months, so author for cost from the start:
-
-- **Match the model to the work; use Auto when unsure.** Pick a small, fast model for routine steps (classify, route, short summaries) and a stronger one for genuinely hard steps. When you are not sure which fits, omit `model` (or pass `model: "auto"`) and the managed lane routes each call to a fitting model, with no routing fee. Raise `reasoning` only where a step needs careful multi-step thinking.
-- **Scope each `agent()` leaf.** A judge or classifier needs no tools and one answer: pass `builtins: "none"` plus a `schema`; use `builtins: "read-only"` for analysis. Fewer tools mean a smaller prompt and fewer stray turns. Do parsing, filtering, deduping, and routing in plain code, not another `agent()` call.
-- **Prompt caching is automatic on the managed lane** for the stable front of a prompt, and pays off across the turns of one `agent()` tool-use loop (the prefix is re-read cheaply). Keep instructions and shared context at the front and stable; put the part that varies (the item, the latest message, the file) last. Never bake anything that changes each run (a timestamp, a random id) into the instructions, or the cache never hits. A one-shot call (no tools, no follow-up turn) does not cache, so just make it cheap; when many items share a big context, prefer one agent loop over many separate one-shot calls.
-- **Parallelize** independent work with `parallel([...])` (same tokens, finished sooner). Multi-agent patterns (fan-out and judge, adversarial verify, tournament, loop-until-done) spend N times the tokens, so reach for them when a task is large, parallel, or adversarial, and use a single `agent()` call otherwise.
-- **Don't pay to wait.** Use `sleep` instead of a polling loop; a long sleep releases the machine and resumes later, so idle time is free.
-- **Guardrails.** Always set `budget.max_usd`; keep the default machine unless a step is CPU- or memory-bound; use `workspace: { persist: ... }` to reuse expensive setup (a clone, an index) across runs; put must-not-repeat work behind `workflows.call` so a restart re-attaches instead of redoing it.
-
-## Make the run legible
-
-A run is a permanent, replayable record, and the program decides how much of its story that record tells. Author for visibility from the start: when you come back to a failed run, the log is all you have to go on.
-
-- **Mark each stage with `phase()`.** `phase("Fetch issues")` names a section of the run on the `phase` channel, so the live tail and `boardwalk runs <id> --logs` read as a sequence of named steps instead of one undifferentiated stream. Set one per logical stage.
-- **Narrate inside a stage with `console.log`.** Plain stdout/stderr lands on the `log` channel. Log the facts that explain the run after the fact: counts, the branch taken and why, ids of things created, the decision a step reached. A run whose log answers "what did this actually do?" is one you can debug without re-running it.
-- **The quiet default already tells the story.** The default channel view is `lifecycle` + `phase` + `output`, so well-named phases make a run readable at a glance; `--verbose` / `--stream log` adds the `console.log` detail on demand. So set phases generously and log at each boundary and decision.
-- **Never `console.log` a secret value.** The `log` channel is persisted with the run. Secrets are redacted from the *model's* context, not from your own stdout, so keep credentials out of log lines.
-
-```ts
-phase("Triage");
-const urgent = issues.filter(isUrgent);
-console.log(`${urgent.length} of ${issues.length} need attention`);
-```
 
 ## Installation
 
@@ -113,11 +82,7 @@ Bundles the workflow to a single `.mjs` (the SDK left external, `meta` intact). 
 
 ## Run-event channels
 
-Every engine, local `dev` and the hosted platform alike, emits the same typed event stream. Each event belongs to one **channel**: `lifecycle`, `phase`, `output`, `log`, `agent`. The flags mean the same thing everywhere (`dev`, and `runs --logs`/`--follow`):
-
-- default → `lifecycle` + `phase` + `output` (quiet, readable)
-- `--verbose` → all five channels, including `agent` turns and tool calls
-- `--stream <channels>` → a comma-separated subset (e.g. `--stream output` for just the result)
+Every engine emits the same typed event stream on five channels: `lifecycle`, `phase`, `output`, `log`, `agent`. The default view is quiet (`lifecycle` + `phase` + `output`); `--verbose` adds `agent` turns, tool calls, and `log`; `--stream <channels>` picks a subset (e.g. `--stream output`). The same flags work on `dev` and on `runs --logs`/`--follow`.
 
 ## Authenticate
 
@@ -130,7 +95,7 @@ boardwalk status                  # API host + login (verified live) + project l
 boardwalk logout                  # remove local credentials
 ```
 
-`login` opens a browser for an OAuth PKCE flow and stores a scoped session locally. The default login is least-privilege (deploy, trigger, read runs, list secret/provider names). Writing secrets, wiring inference providers, and deleting workflows need `--scopes admin` (you must be an org admin). For headless/CI use, pass an API key (`bwk_...`) with `--token`, or supply one per-command (below).
+`login` opens a browser for an OAuth PKCE flow and stores a scoped session locally. The default login is least-privilege (deploy, trigger, read runs, list secret/provider names). Writing secrets, wiring inference providers, and deleting workflows need `--scopes admin` (you must be an org admin). For headless/CI use, pass an API key (`bwk_...`) with `--token`, or set `BOARDWALK_API_KEY`.
 
 ## Ship it
 
@@ -268,56 +233,20 @@ The catalog is the set of models an `agent({ model })` call can name on the mana
 
 ## Run on your own machine (`boardwalk runner`)
 
-Besides the hosted fleet, a workflow can run on **your own hardware**, for a workflow that needs your network, a private toolchain, or a machine the hosted runners can't reach. `boardwalk runner` turns the current machine into a self-hosted runner that claims runs from the org's pool. A workflow opts in by declaring `runs_on: { kind: "self-hosted" }` in `meta` (with an optional `pool` and `labels`); everything else about the workflow is unchanged.
+A workflow can run on your own hardware instead of the hosted fleet: declare `runs_on: { kind: "self-hosted" }` in `meta`, then run a self-hosted runner that claims those runs.
 
 ```bash
-boardwalk runner start --org my-team        # register THIS machine + go online (foreground)
-boardwalk runner start --pool ci --labels gpu,linux
+boardwalk runner start --org my-team        # register THIS machine (a plain admin login is enough) + go online
 boardwalk runner start --host               # run WITHOUT isolation: full machine access (trusted only)
-boardwalk runner start --once               # execute one run, then exit
-boardwalk runner list --org my-team         # the org's runners (status, pool, labels, last seen)
-boardwalk runner remove <runnerId> --yes    # deregister (its credential dies immediately)
+boardwalk runner list --org my-team         # the org's runners
+boardwalk runner remove <runnerId> --yes    # deregister
 ```
 
-`runner start` is the whole happy path: a plain `boardwalk login` with **owner/admin** membership is enough, and the CLI registers the machine through the management API (no elevated scopes, no token handling), saves a standing identity under `~/.boardwalk/runner/`, and goes online. Restarts skip registration. **Runs are containerized by default**; `--host` opts out and gives the workflow full access to the machine (only for workflows you trust). **Ctrl-C drains**: the in-flight run finishes and nothing new is claimed.
-
-For fleets (many machines, no interactive login on each), use the two-step token flow: mint a one-time registration token from an admin machine, then redeem it on each target.
-
-```bash
-boardwalk runner pools token --org my-team --pool ci     # mint a one-time token (shown once, 1h TTL)
-boardwalk runner register --url https://api.boardwalk.sh --token bwkreg_...   # redeem it on the target
-boardwalk runner start --pool ci                          # then go online
-```
+Runs are containerized by default (`--host` opts out); Ctrl-C drains. For fleets, mint a one-time token with `boardwalk runner pools token` and redeem it on each machine with `boardwalk runner register`.
 
 ## Project linking (the `--org` flag becomes optional)
 
 The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/project.json` (`{ orgSlug, workflowId }`) and adds `.boardwalk/` to `.gitignore`. Once a directory is linked, `--org` is optional and subsequent commands target the same workflow, a Vercel-style, rename-safe project identity. Deploy each separate project from its own directory so the links don't clobber each other.
-
-## Auth precedence
-
-For commands that talk to Boardwalk (`deploy`, `run`, `cancel`, `runs`, `usage`, `workflows`, `webhook`, `secrets`, `inference`, `models`, `runner`, ...), credentials resolve in this order:
-
-1. `--token <token>` (per-command Bearer token)
-2. `BOARDWALK_API_KEY` environment variable
-3. the stored `boardwalk login` session
-
-The API host follows the same source: an explicit `BOARDWALK_API_URL`/`BOARDWALK_API_DOMAIN` wins, otherwise the stored session's own origin (so a dev or self-hosted login just works), then the default.
-
-## Self-hosting / pointing at another deployment
-
-The CLI is provider-agnostic and works against any Boardwalk deployment. Override the targets via environment variables:
-
-- `BOARDWALK_API_DOMAIN`: the deployment's domain (the simplest single knob; resolves to `https://<domain>`)
-- `BOARDWALK_API_URL`: set the API base explicitly (full URL; the escape hatch for local http / non-standard ports)
-- `BOARDWALK_ISSUER_URL`: the OAuth issuer origin `login` authenticates against
-- `BOARDWALK_OAUTH_CLIENT_ID` / `BOARDWALK_OAUTH_PORT`: OAuth client id (default `boardwalk-cli`) and the local callback port (default `53682`)
-- `BOARDWALK_CONFIG_DIR`: where credentials + config are stored
-
-Example (drive a self-hosted or custom deployment):
-
-```bash
-BOARDWALK_API_DOMAIN=boardwalk.your-company.com boardwalk login
-```
 
 ## Quick reference
 
