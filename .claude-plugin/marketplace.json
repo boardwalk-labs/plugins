@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Official Boardwalk plugins for Claude Code.",
-    "version": "0.1.6"
+    "version": "0.1.7"
   },
   "plugins": [
     {
       "name": "boardwalk",
       "source": "./",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "description": "CLI-first Boardwalk workflows for Claude Code.",
       "author": {
         "name": "Boardwalk Labs",
