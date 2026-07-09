@@ -45,7 +45,9 @@ prompt templates, a rubric). `boardwalk deploy .` on the directory bundles the w
 
 `meta` must be a **pure literal** so Boardwalk derives the manifest without running your code. The
 fields worth knowing: `slug` (required, the stable identity), `triggers` (required: `cron`,
-`webhook`, or `manual`), `permissions.secrets` (the allowlist a run may `secrets.get`), `budget`
+`webhook`, or `manual` — a `cron` trigger may add a static `input` object passed to every
+scheduled run, e.g. `{ kind: "cron", expr: "0 9 * * *", input: { mode: "full" } }`),
+`permissions.secrets` (the allowlist a run may `secrets.get`), `budget`
 (`max_usd`, `max_tokens`, `max_duration_seconds` for active compute, `deadline_seconds` for
 wall-clock including idle), `workspace` (directories to persist between runs), and `runs_on` (the
 machine, default `boardwalk/linux`). The workflow declares **no** model.
