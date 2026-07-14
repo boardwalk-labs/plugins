@@ -1,6 +1,6 @@
 ---
 name: "equip-agents"
-description: "Use when a Boardwalk workflow needs to give an agent() more than a prompt: reusable skills, inline tools, MCP servers, persistent memory, or a human-input gate. Covers the per-call agent() capabilities (skills, tools, mcp, memory, humanInput, and builtins scoping) and the multi-file workflow package that bundles a skills/ folder and other assets. A skill is a skills/<name>/SKILL.md the leaf loads on demand through the built-in skill tool (progressive disclosure), anchored to the code-review example. Pairs with boardwalk-use-cli to scaffold, build, and deploy the package."
+description: "Use when a Boardwalk workflow needs to give an agent() more than a prompt: reusable skills, inline tools, MCP servers, persistent memory, or a human-input gate. Covers the per-call agent() capabilities (skills, tools, mcp, memory, cwd, humanInput, and builtins scoping) and the multi-file workflow package that bundles a skills/ folder and other assets. A skill is a skills/<name>/SKILL.md the leaf loads on demand through the built-in skill tool (progressive disclosure), anchored to the code-review example. Pairs with boardwalk-use-cli to scaffold, build, and deploy the package."
 ---
 
 # Equip an agent() with skills, tools, MCP, and memory
@@ -110,6 +110,15 @@ read and write the same files. Point two agents at the same path to share, or se
 `agent(prompt, { humanInput: true })` gives the leaf a `human_input` tool, so the model itself can pause
 the run to ask a person; it is off by default. For a gate in your own deterministic code instead, call
 the top-level `humanInput()` primitive (see `boardwalk-overview`).
+
+## Work from a subdirectory
+
+`agent(prompt, { cwd: "checkouts/repo-a" })` re-roots the leaf's workspace view to an EXISTING
+subdirectory: file tools resolve and confine there, `bash` starts there, and the leaf is told that
+directory's layout — so a run that clones several repos gives each agent one checkout and clean
+repo-relative paths. Create the directory in program code first (the call fails loudly on a missing
+path). `memory` stays workspace-root-relative, and a `subagent` inherits its parent's `cwd`.
+Requires SDK >= 0.1.29.
 
 ## Scope the built-ins
 
