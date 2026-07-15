@@ -1,6 +1,6 @@
 ---
 name: "boardwalk-use-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput, step.run, now/random/uuid). Covers install, scaffolding (init), local run (dev) and validation (check, including the determinism gate), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), and project linking."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput). Covers install, scaffolding (init), local run (dev) and validation (check), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), and project linking."
 allowed-tools: Bash
 ---
 
@@ -12,9 +12,9 @@ New to Boardwalk? Read the **`boardwalk-overview`** skill first. It covers what 
 
 ## What a Boardwalk workflow is
 
-A workflow is a **TypeScript/JavaScript program file** (or a package directory), whose pure-literal `meta` compiles to the **manifest** (the control-plane contract). There is no YAML and no DSL. The body calls `agent(prompt)` for LLM work (`model` optional, chosen per call) and durable primitives (`secrets.get`, `sleep`, `output`, `workflows.call`, `humanInput`, `step.run`, and the durable `now`/`random`/`uuid`) for everything else. See `boardwalk-overview` for the full model, `write-good-workflows` for authoring it well, and `equip-agents` for giving an `agent()` skills, tools, MCP, and memory.
+A workflow is a **TypeScript/JavaScript program file** (or a package directory), whose pure-literal `meta` compiles to the **manifest** (the control-plane contract). There is no YAML and no DSL. The body calls `agent(prompt)` for LLM work (`model` optional, chosen per call) and durable primitives (`secrets.get`, `sleep`, `output`, `workflows.call`, `humanInput`) for everything else. See `boardwalk-overview` for the full model, `write-good-workflows` for authoring it well, and `equip-agents` for giving an `agent()` skills, tools, MCP, and memory.
 
-**The program must be deterministic across a restart.** A run restarts from the top on a crash and replays from the top on a resume (after a `sleep` or `humanInput`), so a value that changes on the second pass silently corrupts the run. Bare `Date.now()`, `new Date()`, `performance.now()`, `Math.random()`, and `crypto.randomUUID()`/`getRandomValues()` are therefore **blocked**. Use the SDK's durable `await now()`, `await random()`, and `await uuid()`, which record their result once and return the same value on replay. `check`, `deploy`, and `run` enforce this gate (`build`/`dev` only warn); `--allow-nondeterminism` overrides it. Raw I/O like bare `fetch` is advisory-only (legitimate in a non-suspending script), but wrap it in `step.run` if it precedes a `sleep`, so a resume doesn't re-fire it.
+**Write plain TypeScript — `Date.now()` and `Math.random()` just work.** There is no determinism gate. On the hosted fleet a `sleep` or `humanInput` snapshots the whole machine and resumes the exact heap, so a wait loses nothing. A crash (or a wait on a substrate without snapshots) restarts the program from the top, Lambda-style, so make side effects safe to re-run: idempotent keys or upserts, and put must-not-repeat work behind `workflows.call` (which re-attaches to a finished child instead of running it twice). An already-answered `humanInput` gate is never re-asked.
 
 ## Installation
 
@@ -66,10 +66,9 @@ boardwalk dev ./index.ts --token bwk_xxx             # mint the inference key wi
 
 ```bash
 boardwalk check ./index.ts
-boardwalk check ./index.ts --allow-nondeterminism   # downgrade the determinism gate to a warning
 ```
 
-Everything `dev` validates, without executing: full manifest-schema validation (the same schema every engine enforces), an esbuild compile proving every import resolves, **and the determinism gate**, a blocking error on bare `Date.now()`/`Math.random()`/`crypto.randomUUID()` and friends (fix with `now()`/`random()`/`uuid()`, or pass `--allow-nondeterminism`). No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same gate; `build` and `dev` print the warnings without blocking.
+Everything `dev` validates, without executing: full manifest-schema validation (the same schema every engine enforces) and an esbuild compile proving every import resolves. No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same validation.
 
 ### `boardwalk build <file|dir>`: bundle to one deployable file
 

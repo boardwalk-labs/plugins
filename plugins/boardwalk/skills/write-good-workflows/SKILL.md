@@ -116,12 +116,18 @@ const { verdict } = await agent<Verdict>(`Is this change correct? ...`, {
 
 ## Survive a crash
 
-If a run's process dies, Boardwalk restarts the program **from the top**, like a Lambda or a CI job,
-and a resume after a `sleep` or `humanInput` replays from the top too. So the program must be
-**deterministic across a restart**: a value that changes on the second pass corrupts the run. Use the
-durable `now()`, `random()`, and `uuid()` instead of bare `Date.now()`, `Math.random()`, and
-`crypto.randomUUID()` (which are blocked at `check`/`deploy`/`run`), make side effects idempotent,
-and put work you must not repeat behind `workflows.call()` (which re-attaches) rather than inline.
+A `sleep` or `humanInput` snapshots the whole machine and resumes the exact heap, so a wait loses
+nothing and needs no special handling — write plain TypeScript, `Date.now()` and `Math.random()`
+included. What you plan for is a **crash**: if the process dies, Boardwalk restarts the program
+**from the top**, like a Lambda or a CI job, re-running every side effect along the way. So make
+side effects safe to repeat — idempotent keys, upserts, "create if absent" — and put work you must
+not repeat behind `workflows.call()`, which re-attaches to a finished child instead of running it
+twice. An already-answered `humanInput` gate is never re-asked on a restart; its answer is durable.
+
+Checkpoint expensive side effects as you go. A run that clones a repo, makes changes, and pushes
+should push incrementally (or persist `/workspace`), so a crash near the end doesn't throw away the
+work already done — the run restarts from the top, but the pushed commits are still there to resume
+from.
 
 ## Where to go next
 

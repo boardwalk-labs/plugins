@@ -60,9 +60,8 @@ instead of the file. This is what lets an `agent()` load reusable skills and res
   per call: omit it to use Boardwalk's managed inference, or name one to pin it. `provider` defaults
   to the managed lane, or names your own keys. A workflow that does no model work names no model.
 - **Durable primitives do everything else, in plain code:** `secrets.get`, `sleep`, `phase()`,
-  `output`, `artifacts.write`, `workflows.call` (invoke another workflow), `humanInput` (pause for a
-  person), `step.run` (run a side effect once across a resume), and the durable `now()`, `random()`,
-  `uuid()`. `parallel([...])` runs independent work at once.
+  `output`, `artifacts.write`, `workflows.call` (invoke another workflow), and `humanInput` (pause
+  for a person). `parallel([...])` runs independent work at once.
 - **Each `agent()` can be equipped per call**, on top of the default built-in tools, with reusable
   `skills`, inline `tools`, `mcp` servers, and persistent `memory`. See the `equip-agents` skill.
 
@@ -83,11 +82,12 @@ A hosted run can also be pinned to your own machine with a self-hosted runner
 
 Get these right before writing code:
 
-- **The program must be deterministic across a restart.** A run restarts from the top on a crash and
-  replays from the top after a `sleep` or `humanInput`, so a value that changes on the second pass
-  corrupts the run. Bare `Date.now()`, `new Date()`, `Math.random()`, and `crypto.randomUUID()` are
-  blocked at `check`, `deploy`, and `run`. Use the durable `now()`, `random()`, and `uuid()` instead,
-  and wrap other nondeterministic I/O in `step.run(name, fn)` when it precedes a `sleep`.
+- **Write plain TypeScript — `Date.now()` and `Math.random()` just work.** There is no determinism
+  gate. On the hosted fleet a `sleep` or `humanInput` snapshots the whole machine and resumes the
+  exact heap, so a wait loses nothing. A crash (or a wait on a substrate without snapshots) restarts
+  the program from the top, Lambda-style, so make side effects safe to re-run: use idempotent keys
+  or upserts, and put must-not-repeat work behind `workflows.call`, which re-attaches to a finished
+  child instead of running it twice. An already-answered `humanInput` gate is never re-asked.
 - **Secrets never reach the model.** Your program reads them with `secrets.get` (the trusted layer),
   and the SDK redacts known secret values from all `agent()` context. Never `console.log` a secret,
   since run logs are kept.
@@ -102,7 +102,7 @@ via `agent()`, not you (the coding agent reading this) and not a Claude Code sub
 
 ## Where to go next
 
-- To author a workflow well (match the model, keep it legible, guardrails, determinism): use
+- To author a workflow well (match the model, keep it legible, guardrails, surviving restarts): use
   **`write-good-workflows`**.
 - To build a workflow that iterates until a goal is reached (find/fix/verify, drain a queue, poll
   until healthy, a nightly maintainer): use **`write-good-loops`**.
