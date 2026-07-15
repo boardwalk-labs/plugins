@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "boardwalk": {
+      "type": "http",
+      "url": "https://api.boardwalk.sh/mcp/v1",
+      "headers": {
+        "Authorization": "Bearer ${BOARDWALK_API_KEY}"
+      },
+      "note": "Boardwalk control plane: create, schedule (cron/webhook), trigger, and monitor hosted agent workflows. Auth is a Boardwalk API key: create one in the web console (Settings > API keys), then export BOARDWALK_API_KEY=bwk_... in your shell."
+    }
+  }
+}

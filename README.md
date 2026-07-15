@@ -1,14 +1,15 @@
 # Boardwalk plugins
 
-Official plugins that let agent harnesses drive the [Boardwalk](https://boardwalk.sh) CLI.
+Official plugins that let agent harnesses drive [Boardwalk](https://boardwalk.sh): shared skills for the `boardwalk` CLI, plus the hosted control-plane MCP server.
 
-Two shared skills (`boardwalk-use-cli` and `write-good-loops`) packaged for **Claude Code, Codex, Cursor, OpenClaw, and OpenCode**. `boardwalk-use-cli` documents the first-party `boardwalk` CLI so a model can scaffold, run, validate, deploy, trigger, and operate workflows on the user's behalf; `write-good-loops` teaches how to author an agent loop that iterates until a goal is reached (layered exits, bounded-vs-recurring topology, maker/checker verification, durable state).
+Five shared skills packaged for **Claude Code, Codex, Cursor, OpenClaw, and OpenCode**: `boardwalk-overview` (the platform mental model), `boardwalk-use-cli` (the first-party CLI: scaffold, run, validate, deploy, trigger, operate), `write-good-workflows` (authoring quality), `write-good-loops` (iterating agent loops), and `equip-agents` (skills, tools, MCP, memory, and human-input gates inside a workflow). For Claude Code the plugin also connects the [remote MCP server](#remote-mcp-server) so the model can create, schedule, trigger, and monitor workflows directly.
 
 ## Layout
 
 The canonical plugin payload (skills + Codex manifest) lives under `plugins/boardwalk/` so the Codex marketplace installer (`npx codex-plugin add`) finds it where it expects. Per-harness manifests for the other three harnesses live at the repo root and reference the same shared skills:
 
 - `.claude-plugin/` — Claude Code plugin + marketplace manifest
+- `.mcp.json` — remote MCP server config (Claude Code auto-loads it when the plugin is enabled)
 - `.cursor-plugin/` — Cursor plugin manifest
 - `.agents/plugins/` — Codex marketplace catalog
 - `openclaw.plugin.json` — OpenClaw plugin manifest
@@ -62,9 +63,28 @@ ln -s "$(pwd)/plugins/boardwalk/skills/boardwalk-use-cli" \
 
 If you already installed the Claude Code plugin, OpenCode also discovers skills under `~/.claude/skills/`, so the Boardwalk skill is available there with no extra step.
 
+## Remote MCP server
+
+For Claude Code, the plugin also bundles the Boardwalk control-plane MCP server (`.mcp.json`, loaded automatically when the plugin is enabled). It talks to `https://api.boardwalk.sh/mcp/v1` and gives the model the full control plane: create and update workflows, add cron / rate / one-shot schedules, trigger runs, tail run output, answer human-input gates, and manage environments, variables, and secrets metadata.
+
+Auth is a Boardwalk API key sent as a bearer header. Create one in the web console (Settings > API keys), then:
+
+```bash
+export BOARDWALK_API_KEY=bwk_...
+```
+
+Restart Claude Code (or run `/mcp` and reconnect) after setting it. Without the variable the skills still work; only the MCP connection needs it.
+
+Other harnesses connect the same server manually, for example:
+
+```bash
+claude mcp add --transport http boardwalk https://api.boardwalk.sh/mcp/v1 \
+  --header "Authorization: Bearer $BOARDWALK_API_KEY"
+```
+
 ## What it does
 
-Installs two skills. `boardwalk-use-cli` gives the model the `boardwalk` CLI surface: scaffolding (`init`), running locally (`dev`), validating (`check`), bundling (`build`), authenticating, deploying and triggering (`deploy` / `run` / `cancel`), inspecting runs and usage (`runs` / `usage`), and managing workflows, secrets, environments, variables, and inference providers, plus project linking, auth precedence, the run-event channels, and self-hosting knobs. `write-good-loops` teaches the model to author an agent loop that iterates until a goal is reached: the core loop shape, the layered exits every loop needs (verifier, iteration cap, budget, no-progress), bounded-vs-recurring topology, maker/checker verification, durable cross-run state, and not paying to wait. The CLI itself ships separately as [`@boardwalk-labs/cli`](https://www.npmjs.com/package/@boardwalk-labs/cli).
+Installs five skills. `boardwalk-overview` orients a model that is new to Boardwalk: what the platform is and how workflows, triggers, and runs fit together. `boardwalk-use-cli` gives the model the `boardwalk` CLI surface: scaffolding (`init`), running locally (`dev`), validating (`check`), bundling (`build`), authenticating, deploying and triggering (`deploy` / `run` / `cancel`), inspecting runs and usage (`runs` / `usage`), and managing workflows, secrets, environments, variables, and inference providers, plus project linking, auth precedence, the run-event channels, and self-hosting knobs. `write-good-workflows` covers authoring quality: the meta contract, SDK primitives, run legibility, efficiency, and surviving restarts. `write-good-loops` teaches the model to author an agent loop that iterates until a goal is reached: the core loop shape, the layered exits every loop needs (verifier, iteration cap, budget, no-progress), bounded-vs-recurring topology, maker/checker verification, durable cross-run state, and not paying to wait. `equip-agents` covers giving an `agent()` call skills, inline tools, MCP servers, memory, and human-input gates. The CLI itself ships separately as [`@boardwalk-labs/cli`](https://www.npmjs.com/package/@boardwalk-labs/cli).
 
 ## License
 
