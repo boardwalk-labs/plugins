@@ -86,6 +86,16 @@ claude mcp add --transport http boardwalk https://api.boardwalk.sh/mcp/v1 \
 
 Installs five skills. `boardwalk-overview` orients a model that is new to Boardwalk: what the platform is and how workflows, triggers, and runs fit together. `boardwalk-use-cli` gives the model the `boardwalk` CLI surface: scaffolding (`init`), running locally (`dev`), validating (`check`), bundling (`build`), authenticating, deploying and triggering (`deploy` / `run` / `cancel`), inspecting runs and usage (`runs` / `usage`), and managing workflows, secrets, environments, variables, and inference providers, plus project linking, auth precedence, the run-event channels, and self-hosting knobs. `write-good-workflows` covers authoring quality: the meta contract, SDK primitives, run legibility, efficiency, and surviving restarts. `write-good-loops` teaches the model to author an agent loop that iterates until a goal is reached: the core loop shape, the layered exits every loop needs (verifier, iteration cap, budget, no-progress), bounded-vs-recurring topology, maker/checker verification, durable cross-run state, and not paying to wait. `equip-agents` covers giving an `agent()` call skills, inline tools, MCP servers, memory, and human-input gates. The CLI itself ships separately as [`@boardwalk-labs/cli`](https://www.npmjs.com/package/@boardwalk-labs/cli).
 
+## The Boardwalk repos
+
+- [`boardwalk`](https://github.com/boardwalk-labs/boardwalk) — the open-source single-node engine: cron scheduling, webhooks, durable runs, run history
+- [`sdk`](https://github.com/boardwalk-labs/sdk) — `@boardwalk-labs/workflow`, the TypeScript API a workflow program imports
+- [`cli`](https://github.com/boardwalk-labs/cli) — `boardwalk`: scaffold, validate, run locally, deploy
+- [`examples`](https://github.com/boardwalk-labs/examples) — copyable workflow templates (`boardwalk init --template`)
+- [`runner`](https://github.com/boardwalk-labs/runner) — self-hosted runner: your machines execute hosted-scheduled runs
+
+Hosted platform and docs: [boardwalk.sh](https://boardwalk.sh).
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
