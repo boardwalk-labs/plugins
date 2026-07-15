@@ -41,6 +41,12 @@ entry file that imports your helper modules and ships bundled assets next to it 
 prompt templates, a rubric). `boardwalk deploy .` on the directory bundles the whole package. See
 `equip-agents`.
 
+**Write a `README.md` at the package root.** It renders as the workflow's landing page in the
+dashboard, beside the config derived from `meta`. Write it for whoever gets paged at 3am, not for
+whoever wrote the code: what this workflow is for, what it touches, what it costs, what to do when
+it fails. `meta` already tells the reader the schedule and the budget — don't restate them. It always
+ships, whether you deploy the directory or the file.
+
 ## The meta contract
 
 `meta` must be a **pure literal** so Boardwalk derives the manifest without running your code. The

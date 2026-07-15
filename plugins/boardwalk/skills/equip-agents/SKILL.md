@@ -19,6 +19,7 @@ single unit. Point `boardwalk dev`/`build`/`deploy` at the directory instead of 
 code-review/
   package.json
   index.ts              # the entry: exports meta, runs the program
+  README.md             # the workflow's landing page in the dashboard
   lib/parse.ts          # helper modules the entry imports normally
   skills/
     reviewer/
