@@ -102,7 +102,7 @@ export const meta = {
   slug: "repo-maintainer",
   triggers: [{ kind: "cron", expr: "0 3 * * *", timezone: "America/Anchorage" }],
   budget: { max_usd: 5 },
-  workspace: { persist: true },        // carry progress between nightly runs
+  workspace: { persist: ["state"] },   // carry progress between nightly runs
   concurrency: { mode: "serial" },     // never let two ticks clobber that state
 } satisfies WorkflowMeta;
 ```
@@ -142,14 +142,21 @@ A model remembers nothing between runs, so a recurring loop must keep its own re
 already did or it repeats itself. Turn on a persistent workspace and read/write a progress file:
 
 ```ts
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-// meta.workspace = { persist: true }; meta.concurrency = { mode: "serial" };
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+// meta.workspace = { persist: ["state"] }; meta.concurrency = { mode: "serial" };
 
-const donePath = "/workspace/done.json";
+// Your program runs IN the workspace, so relative paths are the workspace.
+const donePath = "state/done.json";
 const done: string[] = existsSync(donePath) ? JSON.parse(readFileSync(donePath, "utf8")) : [];
 // ... do a bounded chunk of work, append to `done` ...
+mkdirSync("state", { recursive: true });
 writeFileSync(donePath, JSON.stringify(done));
 ```
+
+Name the directories that carry (`persist: ["state"]`) rather than `persist: true`. `true` keeps the
+WHOLE workspace, so a loop that clones a repo or runs `npm install` ships all of it to storage on
+every tick — toward the 512 MB snapshot cap and your storage bill. A loop's compounding state is
+usually small; say which part it is.
 
 Persisted state is **last-writer-wins**, so pin `concurrency: { mode: "serial" }` whenever a loop
 shares it. For work that must never be redone on a restart, put it behind `workflows.call(slug,
@@ -197,7 +204,7 @@ loop) and `--template loop-with-verify` (the same loop plus the separate checker
       cadence; `workflows.schedule` only for a runtime-computed schedule.
 - [ ] **The checker is a separate agent**, prompted to refute; the maker never grades itself.
 - [ ] **Dedupe and route in code**, not in another `agent()` call.
-- [ ] **Recurring loops persist state** (`workspace: { persist: true }` + `concurrency: serial`) or
-      re-derive it from the source of truth.
+- [ ] **Recurring loops persist state** (`workspace: { persist: ["state"] }` + `concurrency: serial`)
+      or re-derive it from the source of truth.
 - [ ] **Waits use `sleep`/`humanInput`**, never a busy-wait; idle time should be free.
 - [ ] **Secrets stay in code** (`secrets.get`), never in an agent prompt.

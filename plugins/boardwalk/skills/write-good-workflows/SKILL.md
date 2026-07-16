@@ -58,6 +58,32 @@ scheduled run, e.g. `{ kind: "cron", expr: "0 9 * * *", input: { mode: "full" } 
 wall-clock including idle), `workspace` (directories to persist between runs), and `runs_on` (the
 machine, default `boardwalk/linux`). The workflow declares **no** model.
 
+## The workspace
+
+Your program runs **in** its workspace: it's the working directory and `HOME`, so a relative path is
+the workspace and needs no ceremony.
+
+```ts
+writeFileSync("notes.md", "hi");   // the workspace. Same on dev, hosted, and self-hosted.
+```
+
+It's **scratch** by default — discarded when the run ends. Three ways to make something outlive the
+run, and they combine:
+
+| | Keeps |
+|---|---|
+| `workspace: { persist: ["cache", "state"] }` | exactly those directories |
+| `agent(prompt, { memory: "notes" })` | that directory, declared nowhere |
+| `workspace: { persist: true }` | the whole workspace |
+
+Prefer naming directories. `true` keeps everything, so a clone or a `node_modules` ships to storage
+on every run, toward the 512 MB snapshot cap and your storage bill — a workspace is mostly scratch
+with a small part that compounds, so say which part. Each **environment** keeps its own workspace
+(staging never sees production's), and two concurrent runs sharing one are last-writer-wins, so pin
+`concurrency: { mode: "serial" }` if that would tear. When compounded state goes bad, clear it with
+`boardwalk workspace show <workflow>` / `boardwalk workspace reset <workflow>` — the workflow, its
+triggers, and its history are untouched.
+
 ## Make the run legible
 
 A run is a permanent, replayable record, and your program decides how much of its story that record
@@ -131,9 +157,11 @@ not repeat behind `workflows.call()`, which re-attaches to a finished child inst
 twice. An already-answered `humanInput` gate is never re-asked on a restart; its answer is durable.
 
 Checkpoint expensive side effects as you go. A run that clones a repo, makes changes, and pushes
-should push incrementally (or persist `/workspace`), so a crash near the end doesn't throw away the
-work already done — the run restarts from the top, but the pushed commits are still there to resume
-from.
+should push incrementally (or persist the clone), so a crash near the end doesn't throw away the work
+already done — the run restarts from the top, but the pushed commits are still there to resume from.
+A crash is the one thing a persisted workspace does NOT cover: it saves at the end of a run (success
+or failure) and before a `sleep`, so a hard crash resumes from the last save, not from the instant it
+died.
 
 ## Where to go next
 
