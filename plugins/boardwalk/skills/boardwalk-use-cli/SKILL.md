@@ -41,7 +41,9 @@ boardwalk init                      # scaffold into the current directory
 boardwalk init my-workflow --template <name>
 ```
 
-Creates a starter workflow: the program file, `package.json`, `.env.example`, and `.gitignore`. `--template <name>` selects the starting point and defaults to the built-in `hello`. It never overwrites existing files.
+Creates a starter workflow: the program file, `README.md`, `package.json`, `.env.example`, and `.gitignore`. `--template <name>` selects the starting point and defaults to the built-in `hello`. It never overwrites existing files, and keeps a `README.md` you already have.
+
+**Fill in the scaffolded `README.md`.** It ships with the package on every deploy and becomes the workflow's landing page in the dashboard, beside the config derived from `meta`. It is the only place a reader learns what the workflow is *for*: `meta` can say how it is configured and nothing more. See `write-good-workflows` for what belongs in it.
 
 ### `boardwalk dev <file|dir>`: run it now, locally
 
