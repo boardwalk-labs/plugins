@@ -2,7 +2,7 @@
 
 Official plugins that let agent harnesses drive [Boardwalk](https://boardwalk.sh): shared skills for the `boardwalk` CLI, plus the hosted control-plane MCP server.
 
-Five shared skills packaged for **Claude Code, Codex, Cursor, OpenClaw, and OpenCode**: `boardwalk-overview` (the platform mental model), `boardwalk-use-cli` (the first-party CLI: scaffold, run, validate, deploy, trigger, operate), `write-good-workflows` (authoring quality), `write-good-loops` (iterating agent loops), and `equip-agents` (skills, tools, MCP, memory, and human-input gates inside a workflow). For Claude Code the plugin also connects the [remote MCP server](#remote-mcp-server) so the model can create, schedule, trigger, and monitor workflows directly.
+Five shared skills for **Claude Code, Codex, and Cursor**: `boardwalk-overview` (the platform mental model), `boardwalk-use-cli` (the first-party CLI: scaffold, run, validate, deploy, trigger, operate), `write-good-workflows` (authoring quality), `write-good-loops` (iterating agent loops), and `equip-agents` (skills, tools, MCP, memory, and human-input gates inside a workflow). **OpenClaw and OpenCode** currently wire the `boardwalk-use-cli` skill. For Claude Code the plugin also connects the [remote MCP server](#remote-mcp-server) so the model can create, schedule, trigger, and monitor workflows directly.
 
 ## Layout
 
@@ -16,7 +16,7 @@ The canonical plugin payload (skills + Codex manifest) lives under `plugins/boar
 - `plugins/boardwalk/.codex-plugin/` — Codex plugin manifest
 - `plugins/boardwalk/skills/` — shared skill definitions (all harnesses point here)
 
-OpenCode needs no manifest: it loads Agent Skills natively and reads the same `plugins/boardwalk/skills/` folder directly (see [OpenCode](#opencode) under Install).
+OpenCode needs no manifest: it loads Agent Skills natively, so you link the `boardwalk-use-cli` skill in directly (see [OpenCode](#opencode) under Install).
 
 The skills are single-source-of-truth: a change lands in every harness at once, with no copy step.
 
