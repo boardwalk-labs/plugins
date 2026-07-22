@@ -13,7 +13,7 @@ calls in the same workflow can carry different skills, tools, and memory.
 ## A workflow can be more than one file
 
 A workflow is usually one `index.ts`, but it can be a **package**: a directory the CLI bundles as a
-single unit. Point `boardwalk dev`/`build`/`deploy` at the directory instead of the file.
+single unit. Point `boardwalk check`/`build`/`deploy` at the directory instead of the file.
 
 ```text
 code-review/

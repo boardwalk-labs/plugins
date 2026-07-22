@@ -1,12 +1,12 @@
 ---
 name: "boardwalk-use-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput). Covers install, scaffolding (init), local run (dev) and validation (check), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), and project linking."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput). Covers install, scaffolding (init), validation (check), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), and project linking."
 allowed-tools: Bash
 ---
 
 # Use the Boardwalk CLI
 
-Use this skill whenever the user needs to install, configure, or drive the first-party `boardwalk` CLI, to scaffold a workflow, run it locally, validate it, sign in, deploy it, trigger a run, cancel one, inspect runs and usage, or manage workflows, secrets, environments, variables, and inference providers. This is the canonical reference for the CLI surface.
+Use this skill whenever the user needs to install, configure, or drive the first-party `boardwalk` CLI, to scaffold a workflow, validate it, sign in, deploy it, trigger a run, cancel one, inspect runs and usage, or manage workflows, secrets, environments, variables, and inference providers. This is the canonical reference for the CLI surface.
 
 New to Boardwalk? Read the **`boardwalk-overview`** skill first. It covers what the platform is and the workflow mental model (a workflow is a TypeScript program, not YAML), which this reference assumes you already have.
 
@@ -31,7 +31,7 @@ boardwalk --help
 
 ## The author loop
 
-The CLI is built around a tight local-first loop: **scaffold → run locally → validate → ship.**
+The CLI is built around a tight loop: **scaffold → validate → run → inspect.** Iterate with `boardwalk check` (validate, no auth), `boardwalk run . --org <org>` (deploy + trigger a real run), and `boardwalk runs <id> --logs`/`--follow` (inspect it). To run workflows on your own machine, use a self-hosted runner (`boardwalk runner`, below).
 
 ### `boardwalk init [dir]`: scaffold a project
 
@@ -41,28 +41,9 @@ boardwalk init                      # scaffold into the current directory
 boardwalk init my-workflow --template <name>
 ```
 
-Creates a starter workflow: the program file, `README.md`, `package.json`, `.env.example`, and `.gitignore`. `--template <name>` selects the starting point and defaults to the built-in `hello`. It never overwrites existing files, and keeps a `README.md` you already have.
+Creates a starter workflow: the program file, `README.md`, `package.json`, and `.gitignore`. `--template <name>` selects the starting point and defaults to the built-in `hello`. It never overwrites existing files, and keeps a `README.md` you already have.
 
 **Fill in the scaffolded `README.md`.** It ships with the package on every deploy and becomes the workflow's landing page in the dashboard, beside the config derived from `meta`. It is the only place a reader learns what the workflow is *for*: `meta` can say how it is configured and nothing more. See `write-good-workflows` for what belongs in it.
-
-### `boardwalk dev <file|dir>`: run it now, locally
-
-```bash
-boardwalk dev ./index.ts
-boardwalk dev ./index.ts --input '{"who":"world"}'   # trigger payload exposed to the program as `input`
-boardwalk dev ./index.ts --env .env.local            # resolve secrets from this env file (default: .env)
-boardwalk dev ./index.ts --verbose                   # stream EVERY channel (agent turns, tool calls, logs)
-boardwalk dev ./index.ts --stream output | jq        # just the result, pipe-friendly
-boardwalk dev ./index.ts --stream phase,log
-boardwalk dev ./index.ts --org my-team               # org to bill managed inference to
-boardwalk dev ./index.ts --token bwk_xxx             # mint the inference key with this bearer (CI/headless)
-```
-
-`dev` derives and validates the manifest (precise errors before anything runs), bundles the program, executes it in-process, and streams the run-event log. Secrets resolve from `.env` (or `--env <path>`) and their **values never print**.
-
-**Managed inference needs a login.** An `agent()` call that names no provider uses Boardwalk's managed lane, which the local engine reaches with a short-lived key minted from your `boardwalk login` session (billed to `--org`, or the project link's org). So a managed-`agent()` run needs a one-time login; an agent-free workflow, or one whose `agent()` names its own provider key, runs with **no account**.
-
-**Exit code is the run's verdict:** `0` completed, `1` failed, `130` cancelled (Ctrl-C). That makes `dev` usable as a CI gate.
 
 ### `boardwalk check <file|dir>`: validate without running
 
@@ -70,7 +51,7 @@ boardwalk dev ./index.ts --token bwk_xxx             # mint the inference key wi
 boardwalk check ./index.ts
 ```
 
-Everything `dev` validates, without executing: full manifest-schema validation (the same schema every engine enforces) and an esbuild compile proving every import resolves. No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same validation.
+Full manifest-schema validation (the same schema every engine enforces) and an esbuild compile proving every import resolves — precise errors before anything runs, without executing. No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same validation.
 
 ### `boardwalk build <file|dir>`: bundle to one deployable file
 
@@ -83,7 +64,7 @@ Bundles the workflow to a single `.mjs` (the SDK left external, `meta` intact). 
 
 ## Run-event channels
 
-Every engine emits the same typed event stream on five channels: `lifecycle`, `phase`, `output`, `log`, `agent`. The default view is quiet (`lifecycle` + `phase` + `output`); `--verbose` adds `agent` turns, tool calls, and `log`; `--stream <channels>` picks a subset (e.g. `--stream output`). The same flags work on `dev` and on `runs --logs`/`--follow`.
+Every engine emits the same typed event stream on five channels: `lifecycle`, `phase`, `output`, `log`, `agent`. The default view is quiet (`lifecycle` + `phase` + `output`); `--verbose` adds `agent` turns, tool calls, and `log`; `--stream <channels>` picks a subset (e.g. `--stream output`). The same flags work on `runs --logs`/`--follow`.
 
 ## Authenticate
 
@@ -254,7 +235,6 @@ The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/p
 | Command | Purpose |
 | --- | --- |
 | `boardwalk init [dir] [--template <name>]` | Scaffold a new workflow project |
-| `boardwalk dev <file\|dir>` | Run the workflow now, locally |
 | `boardwalk check <file\|dir>` | Validate locally (no auth, no network) |
 | `boardwalk build <file\|dir> [--out <path>]` | Bundle to one deployable `.mjs` |
 | `boardwalk login [--scopes admin] [--token bwk_...]` | Authenticate (browser OAuth, or store an API key) |

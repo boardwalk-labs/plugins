@@ -64,7 +64,7 @@ Your program runs **in** its workspace: it's the working directory and `HOME`, s
 the workspace and needs no ceremony.
 
 ```ts
-writeFileSync("notes.md", "hi");   // the workspace. Same on dev, hosted, and self-hosted.
+writeFileSync("notes.md", "hi");   // the workspace. Same on hosted and self-hosted.
 ```
 
 It's **scratch** by default — discarded when the run ends. Three ways to make something outlive the

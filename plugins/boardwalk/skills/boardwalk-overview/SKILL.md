@@ -67,13 +67,12 @@ instead of the file. This is what lets an `agent()` load reusable skills and res
 
 ## Where a workflow runs
 
-The same file runs under three engines, with the same manifest and event stream:
+The same file runs under two engines, with the same manifest and event stream:
 
-1. **Locally**, with `boardwalk dev ./index.ts`. No account needed. A one-time `boardwalk login` is
-   required only if a step uses Boardwalk's managed models.
-2. **Self-hosted**, the open-source single-node engine on your own hardware.
-3. **Hosted on Boardwalk**, with `boardwalk deploy`, then triggered on its schedule, webhook, or API,
-   with durability and model routing handled for you.
+1. **Self-hosted**, the open-source single-node engine on your own hardware. No account needed.
+2. **Hosted on Boardwalk**, with `boardwalk deploy`, then triggered on its schedule, webhook, or API,
+   with durability and model routing handled for you. Iterate with `boardwalk check` (validate),
+   `boardwalk run . --org <org>` (deploy + trigger a real run), and `boardwalk runs <id> --logs`.
 
 A hosted run can also be pinned to your own machine with a self-hosted runner
 (`runs_on: { kind: "self-hosted" }` in `meta`). See `boardwalk-use-cli`.
