@@ -1,6 +1,6 @@
 {
   "name": "boardwalk",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "CLI-first Boardwalk workflows for Claude Code — author, validate, run, and ship agent workflows.",
   "author": {
     "name": "Boardwalk Labs",
