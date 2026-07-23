@@ -1,35 +1,37 @@
 ---
 name: "equip-agents"
-description: "Use when a Boardwalk workflow needs to give an agent() more than a prompt: reusable skills, inline tools, MCP servers, persistent memory, or a human-input gate. Covers the per-call agent() capabilities (skills, tools, mcp, memory, cwd, humanInput, and builtins scoping) and the multi-file workflow package that bundles a skills/ folder and other assets. A skill is a skills/<name>/SKILL.md the leaf loads on demand through the built-in skill tool (progressive disclosure), anchored to the code-review example. Pairs with boardwalk-use-cli to scaffold, build, and deploy the package."
+description: "Use when a Boardwalk workflow needs to give an agent() more than a prompt: reusable skills, inline tools, MCP servers, persistent memory, or a human-input gate. Covers the per-call agent() capabilities (skills, tools, mcp, memory, cwd, humanInput, and builtins scoping), short-lived credentials via auth.idToken/auth.apiToken, and the workflow package that bundles a skills/ folder and other assets. A skill is a skills/<name>/SKILL.md the leaf loads on demand through the built-in skill tool (progressive disclosure), anchored to the code-review example. Pairs with boardwalk-use-cli to scaffold, build, and deploy the package."
 ---
 
 # Equip an agent() with skills, tools, MCP, and memory
 
 The engine's built-in coding tools (read, write, edit, ls, grep, glob, bash, webfetch, and more) are
 on by default, so a plain `agent(prompt)` already works in the run's workspace. Everything beyond that
-is added **per `agent()` call**, on its options object. None of it is declared in `meta`: two `agent()`
-calls in the same workflow can carry different skills, tools, and memory.
+is added **per `agent()` call**, on its options object. None of it is declared in `workflow.jsonc`:
+two `agent()` calls in the same workflow can carry different skills, tools, and memory.
 
-## A workflow can be more than one file
+## The workflow package
 
-A workflow is usually one `index.ts`, but it can be a **package**: a directory the CLI bundles as a
-single unit. Point `boardwalk check`/`build`/`deploy` at the directory instead of the file.
+A workflow is a **package**: the directory holding the descriptor and the entry. Point
+`boardwalk check`/`build`/`deploy` at the directory.
 
 ```text
 code-review/
+  workflow.jsonc        # the deployment descriptor
   package.json
-  index.ts              # the entry: exports meta, runs the program
   README.md             # the workflow's landing page in the dashboard
-  lib/parse.ts          # helper modules the entry imports normally
+  src/index.ts          # the entry: exports run
+  src/lib/parse.ts      # helper modules the entry imports normally
   skills/
     reviewer/
       SKILL.md          # a reusable procedure
       checklist.md      # a bundled resource the skill can pull on demand
 ```
 
-The entry imports helpers with ordinary `import`. The `skills/` folder is not imported; it is bundled
-and resolved by name at run time (below). A `skills/` folder is what makes reusable skills possible, so
-giving an agent a skill means shipping a package, not a bare file.
+You never list source files: the code that ships is whatever the entry imports. `skills/**` and
+`README.md` ride along by convention; other non-code assets (prompt templates, fixtures) ship via
+the `files` allowlist in `workflow.jsonc`. The `skills/` folder is not imported; it is bundled and
+resolved by name at run time (below).
 
 ## Give an agent reusable skills
 
@@ -44,22 +46,18 @@ loads with **progressive disclosure**, the same model these plugin skills use:
   `skill({ name: "reviewer", file: "checklist.md" })`.
 
 ```ts
-import { agent, input, output, type WorkflowMeta } from "@boardwalk-labs/workflow";
+import { agent } from "@boardwalk-labs/workflow";
 
-export const meta = {
-  slug: "code-review",
-  triggers: [{ kind: "manual" }],
-  budget: { max_usd: 1 },
-} satisfies WorkflowMeta;
+interface Change { diff: string }
 
-const { diff } = input as { diff: string };
-
-const review = await agent(
-  `Review this change. You have a "reviewer" skill: call the \`skill\` tool to load its
-instructions before you start, and load its checklist resource if you need the detail.\n\n${diff}`,
-  { skills: ["reviewer"] },
-);
-output({ review });
+export default async function run(input: Change): Promise<{ review: string }> {
+  const review = await agent(
+    `Review this change. You have a "reviewer" skill: call the \`skill\` tool to load its
+instructions before you start, and load its checklist resource if you need the detail.\n\n${input.diff}`,
+    { skills: ["reviewer"] },
+  );
+  return { review };
+}
 ```
 
 The bundled `skills/reviewer/SKILL.md` is a plain file with `name` and `description` frontmatter, the
@@ -79,7 +77,7 @@ const answer = await agent("What is the on-call rotation today?", {
       name: "pagerduty_oncall",
       description: "Look up who is on call for a schedule right now.",
       inputSchema: { type: "object", properties: { schedule: { type: "string" } }, required: ["schedule"] },
-      execute: async ({ schedule }) => fetchOncall(schedule as string),
+      execute: async (input) => fetchOncall((input as { schedule: string }).schedule),
     },
   ],
 });
@@ -98,6 +96,19 @@ await agent("Summarize the open issues.", {
   ],
 });
 ```
+
+## Short-lived credentials (`auth`)
+
+When a tool or MCP server calls your own systems, don't bake in long-lived keys — mint on demand.
+Both mints are actions, so they are imports (never `context` fields), and both are redacted from
+model context like any secret:
+
+- `auth.idToken(audience)` — a short-lived OIDC JWT asserting this run's identity, for keyless
+  federation into AWS/GCP/Azure instead of cloud keys in secrets. Requires
+  `"permissions": { "id_token": "write" }` in `workflow.jsonc`, plus a trust policy in the target
+  cloud pinned to the Boardwalk issuer.
+- `auth.apiToken()` — a short-lived, run-scoped bearer for Boardwalk's own API/MCP; pass it into an
+  MCP `headers` block or a subprocess env explicitly.
 
 ## Persistent memory
 
@@ -119,7 +130,6 @@ subdirectory: file tools resolve and confine there, `bash` starts there, and the
 directory's layout — so a run that clones several repos gives each agent one checkout and clean
 repo-relative paths. Create the directory in program code first (the call fails loudly on a missing
 path). `memory` stays workspace-root-relative, and a `subagent` inherits its parent's `cwd`.
-Requires SDK >= 0.1.29.
 
 ## Scope the built-ins
 
@@ -129,10 +139,11 @@ explicit subset. A judge or classifier wants `builtins: "none"` plus a `schema`;
 
 ## Gotchas
 
-- **Skills need a package.** `agent({ skills })` resolves from the deployed package's `skills/` folder,
-  so a single bare file has nowhere to load them from. Ship a directory.
-- **All of this is per `agent()` call, never a `meta` field.** The manifest declares no tools, skills,
-  MCP servers, or memory. Capabilities live on each call.
+- **`skills/` rides by convention.** `agent({ skills })` resolves from the deployed package's
+  `skills/` folder — no `files` entry needed; just put `skills/<name>/SKILL.md` in the package
+  before you name it.
+- **All of this is per `agent()` call, never a descriptor field.** `workflow.jsonc` declares no
+  tools, skills, MCP servers, or memory. Capabilities live on each call.
 - **Keep credentials in code.** The program may hold secrets (`secrets.get`) and hand them to a tool or
   MCP server; secret values are redacted from model context, so never put them in the prompt.
 - **Two different SKILL.md consumers.** This file is a Claude Code plugin skill. A workflow's
@@ -141,5 +152,5 @@ explicit subset. A judge or classifier wants `builtins: "none"` plus a `schema`;
 
 ## Where to go next
 
-- To scaffold, build, and deploy the package (directory in, one bundle out): use **`boardwalk-use-cli`**.
+- To scaffold, build, and deploy the package (directory in, one artifact out): use **`boardwalk-use-cli`**.
 - For what a workflow is and how the pieces fit: use **`boardwalk-overview`**.

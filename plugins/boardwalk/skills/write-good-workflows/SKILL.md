@@ -1,6 +1,6 @@
 ---
 name: "write-good-workflows"
-description: "Use when authoring or improving a Boardwalk workflow program to make it correct, cheap, and legible, not just working. Covers the shape of a workflow (the meta contract plus the script body, growing into a package), the SDK primitives (agent, phase, output, sleep, workflows.call, parallel), making a run legible with phases and console.log, writing efficient workflows (match the model per agent() call, scope tools and output, prompt caching, parallelism, don't pay to wait, budget and reuse guardrails), and surviving crashes and restarts. For iterating loops see write-good-loops; for giving an agent() skills/tools/MCP/memory see equip-agents; for running and deploying see boardwalk-use-cli."
+description: "Use when authoring or improving a Boardwalk workflow program to make it correct, cheap, and legible, not just working. Covers the shape of a workflow (the run function plus the workflow.jsonc descriptor, growing into a package), typed input and output (native types drive the run form and the output contract), the SDK primitives (agent, phase, sleep, workflows.call, parallel), making a run legible with phases and console.log, writing efficient workflows (match the model per agent() call, scope tools and output, prompt caching, parallelism, don't pay to wait, budget and reuse guardrails), and surviving crashes and restarts. For iterating loops see write-good-loops; for giving an agent() skills/tools/MCP/memory see equip-agents; for running and deploying see boardwalk-use-cli."
 allowed-tools: Read, Write, Edit, Bash
 ---
 
@@ -13,50 +13,86 @@ across a restart**. This skill is the craft of authoring the program. For what B
 
 ## The shape
 
-A workflow is one TypeScript file with two parts: a `meta` export (the contract) and a script body
-(the work). It runs top to bottom each time; top-level `await` is normal, and deterministic code
-(fetch, parse, hold secrets) interleaves freely with model calls (`agent()`).
+A workflow is a package of two files: a `run` function (the work) and `workflow.jsonc` (the
+deployment descriptor). The platform calls `run(input, context)` with the trigger's payload;
+whatever you return is the run's output. Deterministic code (fetch, parse, hold secrets)
+interleaves freely with model calls (`agent()`).
+
+`src/index.ts`:
 
 ```ts
-import { phase, agent, output, secrets } from "@boardwalk-labs/workflow";
+import { agent, phase, secrets } from "@boardwalk-labs/workflow";
 
-export const meta = {
-  slug: "morning-digest",
-  triggers: [{ kind: "cron", expr: "0 9 * * 1-5" }],
-  permissions: { secrets: [{ name: "GITHUB_TOKEN" }] },
-};
+export default async function run(): Promise<string> {
+  phase("Fetch issues");
+  const token = await secrets.get("GITHUB_TOKEN");
+  const issues = await fetch("https://api.github.com/issues", {
+    headers: { Authorization: `Bearer ${token}` },
+  }).then((r) => r.json());
 
-phase("Fetch issues");
-const token = await secrets.get("GITHUB_TOKEN");
-const issues = await fetch("https://api.github.com/issues", {
-  headers: { Authorization: `Bearer ${token}` },
-}).then((r) => r.json());
-
-phase("Summarize");
-output(await agent(`Write a morning digest of these issues:\n${JSON.stringify(issues)}`));
+  phase("Summarize");
+  return await agent(`Write a morning digest of these issues:\n${JSON.stringify(issues)}`);
+}
 ```
 
-One file is the starting point, not the ceiling. When a workflow grows, make it a **package**: an
-entry file that imports your helper modules and ships bundled assets next to it (a `skills/` folder,
-prompt templates, a rubric). `boardwalk deploy .` on the directory bundles the whole package. See
-`equip-agents`.
+`workflow.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://boardwalk.sh/schemas/workflow.json",
+  "slug": "morning-digest",
+  "triggers": [{ "kind": "cron", "expr": "0 9 * * 1-5" }],
+  "permissions": { "secrets": [{ "name": "GITHUB_TOKEN" }] },
+}
+```
+
+Python is the same shape: a module-level `async def run(input: Lead) -> Score` in `main.py`, with
+Pydantic models as the contract. Two files are the starting point, not the ceiling. When a workflow
+grows, the package grows with it: the entry imports your helper modules normally, and ships bundled
+assets next to it (a `skills/` folder, prompt templates, a rubric). `boardwalk deploy .` bundles
+whatever the entry imports. See `equip-agents`.
 
 **Write a `README.md` at the package root.** It renders as the workflow's landing page in the
-dashboard, beside the config derived from `meta`. Write it for whoever gets paged at 3am, not for
+dashboard, beside the config from `workflow.jsonc`. Write it for whoever gets paged at 3am, not for
 whoever wrote the code: what this workflow is for, what it touches, what it costs, what to do when
-it fails. `meta` already tells the reader the schedule and the budget — don't restate them. It always
-ships, whether you deploy the directory or the file.
+it fails. The descriptor already tells the reader the schedule and the budget — don't restate them.
+It always ships, by convention.
 
-## The meta contract
+## Type the input and output
 
-`meta` must be a **pure literal** so Boardwalk derives the manifest without running your code. The
-fields worth knowing: `slug` (required, the stable identity), `triggers` (required: `cron`,
-`webhook`, or `manual` — a `cron` trigger may add a static `input` object passed to every
-scheduled run, e.g. `{ kind: "cron", expr: "0 9 * * *", input: { mode: "full" } }`),
-`permissions.secrets` (the allowlist a run may `secrets.get`), `budget`
-(`max_usd`, `max_tokens`, `max_duration_seconds` for active compute, `deadline_seconds` for
-wall-clock including idle), `workspace` (directories to persist between runs), and `runs_on` (the
-machine, default `boardwalk/linux`). The workflow declares **no** model.
+Your native types are the I/O contract — no schema literal, no wrapper:
+
+```ts
+interface Alert  { service: string; message: string }
+interface Triage { action: "page" | "ticket" | "ignore"; reason: string }
+
+export default async function run(input: Alert): Promise<Triage> { /* ... */ }
+```
+
+Annotate the input and the deploy derives its schema from the real type checker, so the dashboard
+renders an **accurate input form** and callers know the shape; a field it can't render degrades to a
+raw-JSON box with a warning — never a wrong widget, never a blocked deploy. A bare `run(input)` is
+the zero-ceremony floor: raw JSON, Lambda-style. At runtime the payload is best-effort converted
+(an ISO string arrives as a real `Date`); there is no pre-run gate, so validate in code if the
+input can be hostile. The **return** is validated against your declared type automatically — a
+mismatch fails the run — and a `void` return persists `null`, which is first-class for a workflow
+whose product is its side effects.
+
+`context` (param 1, declare it only when needed) is read-only metadata: `runId`, `trigger`, `actor`,
+`attempt`, `environment`, `workspaceDir`, `signal`. Data only — everything that acts is an import.
+
+## The descriptor
+
+`workflow.jsonc` is policy the platform enforces around your code, read as data (comments and
+trailing commas welcome; never executed). The fields worth knowing: `slug` (required, the stable
+identity), `triggers` (required: `cron`, `webhook`, `manual`, or `workflow_run` — a `cron` trigger
+may add a static `input` object passed to every scheduled run), `permissions` (the `secrets`
+allowlist a run may `secrets.get`; `id_token` for `auth.idToken`), `budget` (`max_usd`,
+`max_tokens`, `max_compute_seconds` — all metered; a breach pauses the run for approval, never a
+hard kill), `concurrency` (`unlimited` default, `serial`, or per-entity
+`{ "mode": "serial", "key": "refund-${input.customerId}" }`), `workspace` (directories to persist
+between runs), and `runs_on` (the machine, default `boardwalk/linux`). The workflow declares **no**
+model and no I/O schemas — those come from your types.
 
 ## The workspace
 
@@ -72,17 +108,17 @@ run, and they combine:
 
 | | Keeps |
 |---|---|
-| `workspace: { persist: ["cache", "state"] }` | exactly those directories |
+| `"workspace": { "persist": ["cache", "state"] }` | exactly those directories |
 | `agent(prompt, { memory: "notes" })` | that directory, declared nowhere |
-| `workspace: { persist: true }` | the whole workspace |
+| `"workspace": { "persist": true }` | the whole workspace |
 
 Prefer naming directories. `true` keeps everything, so a clone or a `node_modules` ships to storage
 on every run, toward the 512 MB snapshot cap and your storage bill — a workspace is mostly scratch
 with a small part that compounds, so say which part. Each **environment** keeps its own workspace
 (staging never sees production's), and two concurrent runs sharing one are last-writer-wins, so pin
-`concurrency: { mode: "serial" }` if that would tear. When compounded state goes bad, clear it with
-`boardwalk workspace show <workflow>` / `boardwalk workspace reset <workflow>` — the workflow, its
-triggers, and its history are untouched.
+`"concurrency": { "mode": "serial" }` if that would tear. When compounded state goes bad, clear it
+with `boardwalk workspace show <workflow>` / `boardwalk workspace reset <workflow>` — the workflow,
+its triggers, and its history are untouched.
 
 ## Make the run legible
 
@@ -141,10 +177,10 @@ const { verdict } = await agent<Verdict>(`Is this change correct? ...`, {
   large, parallel, or adversarial.
 - **Don't pay to wait.** A long `sleep` suspends the run and releases its machine, so idle time is
   free. Use it instead of a polling loop.
-- **Guardrails and reuse.** Set `budget.max_usd` (a guardrail, not the bill). Keep the default
-  machine unless a step is CPU or memory bound. Persist expensive setup (a clone, an index) with
-  `workspace: { persist: ["repo"] }`. Put must-not-repeat work behind `workflows.call`, which
-  re-attaches to a finished child on restart rather than running it again.
+- **Guardrails and reuse.** Set `budget.max_usd` (a guardrail, not the bill; a breach pauses for
+  approval). Keep the default machine unless a step is CPU or memory bound. Persist expensive setup
+  (a clone, an index) with `"workspace": { "persist": ["repo"] }`. Put must-not-repeat work behind
+  `workflows.call`, which re-attaches to a finished child on restart rather than running it again.
 
 ## Survive a crash
 
@@ -155,6 +191,7 @@ included. What you plan for is a **crash**: if the process dies, Boardwalk resta
 side effects safe to repeat — idempotent keys, upserts, "create if absent" — and put work you must
 not repeat behind `workflows.call()`, which re-attaches to a finished child instead of running it
 twice. An already-answered `humanInput` gate is never re-asked on a restart; its answer is durable.
+`context.attempt` tells you which attempt you're on (it stays 1 until a crash-restart).
 
 Checkpoint expensive side effects as you go. A run that clones a repo, makes changes, and pushes
 should push incrementally (or persist the clone), so a crash near the end doesn't throw away the work
@@ -162,6 +199,9 @@ already done — the run restarts from the top, but the pushed commits are still
 A crash is the one thing a persisted workspace does NOT cover: it saves at the end of a run (success
 or failure) and before a `sleep`, so a hard crash resumes from the last save, not from the instant it
 died.
+
+And because `run` is a plain function, unit-test it as one: `installTestHost({ agent, secrets, ... })`
+stubs the capabilities, making `run(input)` an ordinary call with no platform in sight.
 
 ## Where to go next
 

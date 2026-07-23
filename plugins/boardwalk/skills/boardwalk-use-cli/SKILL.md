@@ -1,6 +1,6 @@
 ---
 name: "boardwalk-use-cli"
-description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a TypeScript/JavaScript program file whose pure-literal `meta` compiles to the manifest and that calls `agent(prompt)` plus durable primitives (secrets, sleep, phases, output, artifacts, workflows.call, humanInput). Covers install, scaffolding (init), validation (check), bundling (build), OAuth login, deploy, triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), and project linking."
+description: "Use when a user wants to install, configure, authenticate against, or drive the first-party Boardwalk CLI, the `boardwalk` command for authoring, validating, running, shipping, and operating agent workflows. A workflow is a package: a TypeScript or Python `run` function plus a `workflow.jsonc` deployment descriptor, calling `agent(prompt)` and durable primitives (secrets, sleep, phases, artifacts, workflows.call, humanInput) and returning the run's output. Covers install, scaffolding (init, incl. --python), validation (check), building the artifact (build), OAuth login, deploy (deterministic org resolution), triggering and cancelling runs, inspecting runs and usage, human-in-the-loop inputs (inputs/respond), managing workflows, secrets, environments, variables, persistent workspaces, and inference providers, the managed model catalog (models), webhook URLs (header-based, secret never in the URL), self-hosted runners (runner), and project linking."
 allowed-tools: Bash
 ---
 
@@ -8,11 +8,11 @@ allowed-tools: Bash
 
 Use this skill whenever the user needs to install, configure, or drive the first-party `boardwalk` CLI, to scaffold a workflow, validate it, sign in, deploy it, trigger a run, cancel one, inspect runs and usage, or manage workflows, secrets, environments, variables, and inference providers. This is the canonical reference for the CLI surface.
 
-New to Boardwalk? Read the **`boardwalk-overview`** skill first. It covers what the platform is and the workflow mental model (a workflow is a TypeScript program, not YAML), which this reference assumes you already have.
+New to Boardwalk? Read the **`boardwalk-overview`** skill first. It covers what the platform is and the workflow mental model (a workflow is a typed function, not YAML), which this reference assumes you already have.
 
 ## What a Boardwalk workflow is
 
-A workflow is a **TypeScript/JavaScript program file** (or a package directory), whose pure-literal `meta` compiles to the **manifest** (the control-plane contract). There is no YAML and no DSL. The body calls `agent(prompt)` for LLM work (`model` optional, chosen per call) and durable primitives (`secrets.get`, `sleep`, `output`, `workflows.call`, `humanInput`) for everything else. See `boardwalk-overview` for the full model, `write-good-workflows` for authoring it well, and `equip-agents` for giving an `agent()` skills, tools, MCP, and memory.
+A workflow is a **package**: a directory holding `workflow.jsonc` (the deployment descriptor — triggers, permissions, budget, read as data) and an entry exporting a `run` function the platform calls — `src/index.ts` with `export default async function run(input, context)`, or `main.py` with a module-level `async def run`. There is no YAML pipeline and no DSL. Native types on the signature are the I/O contract (the deploy derives their schemas for the dashboard's run form), and the return value is the run's output. The body calls `agent(prompt)` for LLM work (`model` optional, chosen per call) and durable primitives (`secrets.get`, `sleep`, `workflows.call`, `humanInput`) for everything else. See `boardwalk-overview` for the full model, `write-good-workflows` for authoring it well, and `equip-agents` for giving an `agent()` skills, tools, MCP, and memory.
 
 **Write plain TypeScript — `Date.now()` and `Math.random()` just work.** There is no determinism gate. On the hosted fleet a `sleep` or `humanInput` snapshots the whole machine and resumes the exact heap, so a wait loses nothing. A crash (or a wait on a substrate without snapshots) restarts the program from the top, Lambda-style, so make side effects safe to re-run: idempotent keys or upserts, and put must-not-repeat work behind `workflows.call` (which re-attaches to a finished child instead of running it twice). An already-answered `humanInput` gate is never re-asked.
 
@@ -29,38 +29,41 @@ npm install -g @boardwalk-labs/cli
 boardwalk --help
 ```
 
+`boardwalk setup` is the one-command onboarding: it logs in, detects your coding agent (Claude Code, Codex, Cursor, ...), and installs its Boardwalk plugin + MCP server.
+
 ## The author loop
 
-The CLI is built around a tight loop: **scaffold → validate → run → inspect.** Iterate with `boardwalk check` (validate, no auth), `boardwalk run . --org <org>` (deploy + trigger a real run), and `boardwalk runs <id> --logs`/`--follow` (inspect it). To run workflows on your own machine, use a self-hosted runner (`boardwalk runner`, below).
+The CLI is built around a tight loop: **scaffold → validate → run → inspect.** Iterate with `boardwalk check` (validate the package, no auth), `boardwalk run . --org <org>` (deploy + trigger a real run), and `boardwalk runs <id> --logs`/`--follow` (inspect it). There is no local run mode: unit tests call `run(input)` directly over `installTestHost` stubs, and live execution is deploy + trigger — point it at a dev environment with `--environment` while iterating. To run workflows on your own machine, use a self-hosted runner (`boardwalk runner`, below).
 
 ### `boardwalk init [dir]`: scaffold a project
 
 ```bash
 boardwalk init my-workflow          # scaffold into ./my-workflow
 boardwalk init                      # scaffold into the current directory
+boardwalk init my-workflow --python # a Python workflow (main.py + pyproject.toml)
 boardwalk init my-workflow --template <name>
 ```
 
-Creates a starter workflow: the program file, `README.md`, `package.json`, and `.gitignore`. `--template <name>` selects the starting point and defaults to the built-in `hello`. It never overwrites existing files, and keeps a `README.md` you already have.
+Creates the two-file package: `workflow.jsonc`, `src/index.ts` (typed `run` function), `README.md`, `package.json`, `tsconfig.json`, and `.gitignore`. `--python` swaps in `main.py` + `pyproject.toml` (dependencies resolve with `uv` at build time). `--template <name>` selects the starting point from the examples registry and defaults to the built-in `hello`, which works offline. It also drops the Boardwalk agent skills into `.claude/skills/` so a coding agent working in the project has local context. It never overwrites existing files, and keeps a `README.md` you already have.
 
-**Fill in the scaffolded `README.md`.** It ships with the package on every deploy and becomes the workflow's landing page in the dashboard, beside the config derived from `meta`. It is the only place a reader learns what the workflow is *for*: `meta` can say how it is configured and nothing more. See `write-good-workflows` for what belongs in it.
+**Fill in the scaffolded `README.md`.** It ships with the package on every deploy and becomes the workflow's landing page in the dashboard, beside the config from `workflow.jsonc`. It is the only place a reader learns what the workflow is *for*: the descriptor can say how it is configured and nothing more. See `write-good-workflows` for what belongs in it.
 
-### `boardwalk check <file|dir>`: validate without running
-
-```bash
-boardwalk check ./index.ts
-```
-
-Full manifest-schema validation (the same schema every engine enforces) and an esbuild compile proving every import resolves — precise errors before anything runs, without executing. No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same validation.
-
-### `boardwalk build <file|dir>`: bundle to one deployable file
+### `boardwalk check <dir>`: validate without running
 
 ```bash
-boardwalk build ./index.ts                 # writes <slug>.mjs in the cwd
-boardwalk build ./index.ts --out dist/wf.mjs
+boardwalk check .
 ```
 
-Bundles the workflow to a single `.mjs` (the SDK left external, `meta` intact). This is what a self-hosted server loads from its `BOARDWALK_WORKFLOWS_DIR`.
+Everything a deploy does except the upload, all local: validates `workflow.jsonc` against the descriptor schema (the same one the server enforces, including the `concurrency.key` template syntax), esbuild-compiles the entry proving every import resolves (strip-only — your body is never type-checked), and packs the artifact. The I/O schemas derive at deploy (the backend reads the `run()` signature and returns warnings). No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same validation.
+
+### `boardwalk build <dir>`: build the deploy artifact
+
+```bash
+boardwalk build .                 # writes <slug>.tgz in the cwd
+boardwalk build . --out dist/wf.tgz
+```
+
+Produces the exact content-addressed `.tgz` a deploy uploads: the bundled entry, the descriptor, the source tree, `skills/**` + `README.md` + the descriptor's `files` assets, and the TypeScript types harvest the backend derives the I/O schemas from. Deploy builds it for you; reach for `build` to inspect what ships.
 
 ## Run-event channels
 
@@ -72,7 +75,7 @@ Every engine emits the same typed event stream on five channels: `lifecycle`, `p
 boardwalk login                   # browser OAuth (PKCE) → stores a least-privilege session
 boardwalk login --scopes admin    # elevated session: manage secrets/providers, delete workflows
 boardwalk login --token bwk_xxx   # store an API key instead of the browser flow
-boardwalk whoami                  # show the current stored session (scope + expiry)
+boardwalk whoami                  # show the current stored session + the account's orgs
 boardwalk status                  # API host + login (verified live) + project link
 boardwalk logout                  # remove local credentials
 ```
@@ -81,20 +84,23 @@ boardwalk logout                  # remove local credentials
 
 ## Ship it
 
-### `boardwalk deploy <file|dir>`: create or update a workflow
+### `boardwalk deploy <dir>`: create or update a workflow
 
 ```bash
-boardwalk deploy ./index.ts --org my-team
-boardwalk deploy ./index.ts --org my-team --dry-run   # print the plan (create vs update), write nothing
-boardwalk deploy ./index.ts --token bwk_xxx           # use this Bearer token for this call
+boardwalk deploy . --org my-team
+boardwalk deploy . --org my-team --dry-run   # print the plan (create vs update), write nothing
+boardwalk deploy . --token bwk_xxx           # use this Bearer token for this call
+boardwalk deploy . --yes                     # CI: skip the create confirmation
 ```
 
-### `boardwalk run <file|dir>`: deploy, trigger a real run, wait for the result
+The org is resolved deterministically, never guessed: `--org` wins; else a single-org credential's scope is unambiguous; else the project link (below); else a hard error listing your orgs. A deploy that would **create** a new workflow confirms interactively first (`--yes` skips, for CI); updates never prompt. The workflow's identity is `(org, slug)` — the descriptor carries no org, so a fork deploys to whoever runs it. The server derives the I/O schemas from your `run` signature and prints any derivation warnings.
+
+### `boardwalk run <dir>`: deploy, trigger a real run, wait for the result
 
 ```bash
-boardwalk run ./index.ts --org my-team --input '{"who":"world"}'
-boardwalk run ./index.ts --org my-team --no-wait      # trigger and exit without waiting
-boardwalk run ./index.ts --org my-team --environment Production   # run against an environment (its secrets + variables)
+boardwalk run . --org my-team --input '{"who":"world"}'   # --input becomes run(input)
+boardwalk run . --org my-team --no-wait                   # trigger and exit without waiting
+boardwalk run . --org my-team --environment Production    # run against an environment (its secrets + variables)
 ```
 
 `--environment <name>` picks which environment's secrets and variables the run resolves (omit = the org base). See `boardwalk environments` / `boardwalk variables` below.
@@ -143,6 +149,8 @@ boardwalk usage --org my-team               # runs, compute, tokens, credit, aut
 boardwalk usage --org my-team --days 30 --json
 ```
 
+For a single run's live budget state from *inside* the program, the SDK's `usage.get()` is the hook (see `write-good-loops`).
+
 ### `boardwalk workflows`: inspect and manage
 
 ```bash
@@ -153,6 +161,15 @@ boardwalk workflows enable <id|slug>        # resume a disabled workflow's trigg
 boardwalk workflows delete <id|slug> --yes  # irreversible; needs an elevated login
 ```
 
+### `boardwalk workspace`: a workflow's persistent state
+
+```bash
+boardwalk workspace show my-flow            # what it's storing, per environment: size + last written
+boardwalk workspace reset my-flow --yes     # clear it; the workflow, triggers, and history stay
+```
+
+A workflow opts into persistence with `"workspace": { "persist": [...] }` in `workflow.jsonc` or an `agent({ memory })` call. Reset exists because state that compounds eventually compounds something wrong (a poisoned cache, a memory that learned the wrong lesson); `--environment` addresses one environment's copy.
+
 ### `boardwalk webhook <id|slug>`: inbound webhook URL
 
 ```bash
@@ -160,7 +177,7 @@ boardwalk webhook <id|slug>                 # show the inbound URL + verificatio
 boardwalk webhook <id|slug> --rotate        # regenerate the secret and reveal it ONCE (admin)
 ```
 
-The **secret is never in the URL**. The URL is the bare workflow endpoint, safe to share. The secret rides in a header per the trigger's verifier preset: `token` sends it verbatim in `X-Boardwalk-Token`, `custom_header` in a caller-named header, `signature` as an HMAC-SHA256 of the raw body in `X-Boardwalk-Signature: sha256=<hex>`, and the provider presets (`github`/`stripe`/`slack`/`linear`) verify that provider's own signing scheme. Plain `webhook <ref>` prints the endpoint and scheme but no secret; `--rotate` (admin-gated) mints a new secret, invalidates the old one, and reveals the new value a single time, so reconfigure the sender afterward. A workflow gets a webhook by declaring `{ kind: "webhook", auth: "token" }` (or another preset) in `meta.triggers`.
+The **secret is never in the URL**. The URL is the bare workflow endpoint, safe to share. The secret rides in a header per the trigger's verifier preset: `token` sends it verbatim in `X-Boardwalk-Token`, `custom_header` in a caller-named header, `signature` as an HMAC-SHA256 of the raw body in `X-Boardwalk-Signature: sha256=<hex>`, and the provider presets (`github`/`stripe`/`slack`/`linear`) verify that provider's own signing scheme. Plain `webhook <ref>` prints the endpoint and scheme but no secret; `--rotate` (admin-gated) mints a new secret, invalidates the old one, and reveals the new value a single time, so reconfigure the sender afterward. A workflow gets a webhook by declaring `{ "kind": "webhook", "auth": "token" }` (or another preset) in the descriptor's `triggers`.
 
 ### `boardwalk secrets`: manage the org's secrets (values never returned)
 
@@ -176,7 +193,7 @@ Writing or deleting secrets needs `boardwalk login --scopes admin`. `--scope` is
 
 ### `boardwalk environments` / `boardwalk variables`: environment config (GitHub-Actions style)
 
-The org keeps **secrets** (encrypted credentials, read in code via `secrets.get`) and non-secret **variables** (injected into the run as `process.env`), organized into **environments**. The **organization base** applies to every run; a named **environment** (e.g. `Production`) holds its own secrets + variables. A run **targets one environment** and resolves its config from it, **falling back to the org base**. The same name can hold a different value per environment. Pick the environment per run with `boardwalk run --environment <name>` (omit = the org base); it is NOT a manifest field.
+The org keeps **secrets** (encrypted credentials, read in code via `secrets.get`) and non-secret **variables** (injected into the run as `process.env`), organized into **environments**. The **organization base** applies to every run; a named **environment** (e.g. `Production`) holds its own secrets + variables. A run **targets one environment** and resolves its config from it, **falling back to the org base**. The same name can hold a different value per environment. Pick the environment per run with `boardwalk run --environment <name>` (omit = the org base); it is NOT a descriptor field.
 
 ```bash
 boardwalk environments                       # named environments (the org base always applies underneath)
@@ -215,7 +232,7 @@ The catalog is the set of models an `agent({ model })` call can name on the mana
 
 ## Run on your own machine (`boardwalk runner`)
 
-A workflow can run on your own hardware instead of the hosted fleet: declare `runs_on: { kind: "self-hosted" }` in `meta`, then run a self-hosted runner that claims those runs.
+A workflow can run on your own hardware instead of the hosted fleet: declare `"runs_on": { "kind": "self-hosted" }` in `workflow.jsonc`, then run a self-hosted runner that claims those runs.
 
 ```bash
 boardwalk runner start --org my-team        # register THIS machine (a plain admin login is enough) + go online
@@ -228,25 +245,27 @@ Runs are containerized by default (`--host` opts out); Ctrl-C drains. For fleets
 
 ## Project linking (the `--org` flag becomes optional)
 
-The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/project.json` (`{ orgSlug, workflowId }`) and adds `.boardwalk/` to `.gitignore`. Once a directory is linked, `--org` is optional and subsequent commands target the same workflow, a Vercel-style, rename-safe project identity. Deploy each separate project from its own directory so the links don't clobber each other.
+The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/project.json` (`{ orgSlug, workflowId }`) and adds `.boardwalk/` to `.gitignore`. It is a local cache, never a source of truth — the org always comes from `--org`, a single-org credential, or this link, in that order, and a multi-org credential with none of them is a hard error, never a guess. Once a directory is linked, `--org` is optional and subsequent commands target the same workflow. Deploy each separate project from its own directory so the links don't clobber each other.
 
 ## Quick reference
 
 | Command | Purpose |
 | --- | --- |
-| `boardwalk init [dir] [--template <name>]` | Scaffold a new workflow project |
-| `boardwalk check <file\|dir>` | Validate locally (no auth, no network) |
-| `boardwalk build <file\|dir> [--out <path>]` | Bundle to one deployable `.mjs` |
+| `boardwalk init [dir] [--python] [--template <name>]` | Scaffold a new workflow package |
+| `boardwalk check <dir>` | Validate the package locally (no auth, no network) |
+| `boardwalk build <dir> [--out <path>]` | Build the deployable artifact (`.tgz`) |
+| `boardwalk setup` | One-command onboarding: login + coding-agent plugin + MCP |
 | `boardwalk login [--scopes admin] [--token bwk_...]` | Authenticate (browser OAuth, or store an API key) |
 | `boardwalk whoami` / `boardwalk status` / `boardwalk logout` | Inspect / verify / clear credentials |
-| `boardwalk deploy <file\|dir> [--org <slug>] [--dry-run]` | Create or update a workflow |
-| `boardwalk run <file\|dir> [--org <slug>] [--input <json>] [--environment <name>] [--no-wait]` | Deploy + trigger a real run |
+| `boardwalk deploy <dir> [--org <slug>] [--dry-run] [--yes]` | Create or update a workflow |
+| `boardwalk run <dir> [--org <slug>] [--input <json>] [--environment <name>] [--no-wait]` | Deploy + trigger a real run |
 | `boardwalk cancel <runId>` | Cancel a queued or in-flight run |
 | `boardwalk runs [runId] [--logs] [--follow] [--json]` | List runs, show one, or stream its log |
 | `boardwalk inputs [runId] [--json]` | List human-in-the-loop inputs awaiting a response |
 | `boardwalk respond <runId> <key> [--value\|--values\|--other ...]` | Answer a pending input, resuming the run |
 | `boardwalk usage [--org <slug>] [--days <n>] [--json]` | Org spend and activity |
 | `boardwalk workflows [list\|show\|disable\|enable\|delete] ...` | Inspect and manage workflows |
+| `boardwalk workspace [show\|reset] <workflow> ...` | Inspect / clear a workflow's persistent workspace |
 | `boardwalk webhook <id\|slug> [--rotate]` | Show / rotate a workflow's inbound webhook URL |
 | `boardwalk secrets [list\|set\|delete] ...` | Manage the org's secrets (admin to write) |
 | `boardwalk environments [list\|create\|delete] ...` | Manage named environments (config sets a run targets) |

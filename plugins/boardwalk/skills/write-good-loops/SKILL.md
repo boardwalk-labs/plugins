@@ -1,6 +1,6 @@
 ---
 name: "write-good-loops"
-description: "Use when a user wants to build an agent LOOP in Boardwalk, a workflow that iterates until a goal is reached rather than running once. Covers find/fix/verify loops, poll-until-healthy, drain-a-queue, and run-on-a-schedule maintainers. Teaches the core loop shape (plain control flow over agent()), the layered exits every loop needs (a verifier, a hard iteration cap, a budget, no-progress detection), choosing the topology (one long run with while+sleep vs a recurring cron trigger of many short runs vs workflows.schedule for runtime-computed cadences), splitting the maker from the checker for verification, carrying durable state across runs, and never paying for idle wait. Pairs with boardwalk-use-cli for scaffolding, validating (boardwalk check), and running the loop."
+description: "Use when a user wants to build an agent LOOP in Boardwalk, a workflow that iterates until a goal is reached rather than running once. Covers find/fix/verify loops, poll-until-healthy, drain-a-queue, and run-on-a-schedule maintainers. Teaches the core loop shape (plain control flow over agent()), the layered exits every loop needs (a verifier, a hard iteration cap, a budget plus usage.get() self-governing, no-progress detection), choosing the topology (one long run with while+sleep vs a recurring cron trigger of many short runs vs workflows.schedule for runtime-computed cadences), splitting the maker from the checker for verification, carrying durable state across runs, and never paying for idle wait. Pairs with boardwalk-use-cli for scaffolding, validating (boardwalk check), and running the loop."
 allowed-tools: Read, Write, Edit, Bash
 ---
 
@@ -11,10 +11,10 @@ running a single prompt: find every bug in a diff, drain a queue, watch a servic
 healthy, or maintain a repo every night. A loop is how you hand the whole find → act → check → repeat
 cycle to the workflow, so the user defines the goal once instead of re-prompting each step.
 
-A Boardwalk workflow is a TypeScript/JavaScript program file (new to Boardwalk? see
+A Boardwalk workflow is a `run` function plus a `workflow.jsonc` descriptor (new to Boardwalk? see
 `boardwalk-overview` for the mental model, `write-good-workflows` for the general authoring craft, and
 `boardwalk-use-cli` for how to scaffold/validate/run one). A loop is **not** a platform feature you
-configure; it's ordinary control flow in that program. So the whole skill is about writing that
+configure; it's ordinary control flow in that function. So the whole skill is about writing that
 control flow well: giving it exits, shaping it right, verifying its output, and carrying state.
 
 ## The core shape
@@ -25,37 +25,61 @@ actually there. Track what's been seen in plain code, ask the agent only for wha
 couple of empty rounds.
 
 ```ts
-import { phase, agent, input, output, type WorkflowMeta } from "@boardwalk-labs/workflow";
+import { agent, phase } from "@boardwalk-labs/workflow";
 
-export const meta = {
-  slug: "loop-until-done",
-  triggers: [{ kind: "manual" }],
-  budget: { max_usd: 2 },           // a non-negotiable exit (see below)
-} satisfies WorkflowMeta;
+interface Job { text: string; maxRounds?: number }
 
-const { text, maxRounds = 8 } = input as { text: string; maxRounds?: number };
-const seen = new Set<string>();
-const all: { title: string; detail: string }[] = [];
-let dry = 0;
-let round = 0;
+const FINDINGS_SCHEMA = {
+  type: "object",
+  properties: {
+    findings: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { title: { type: "string" }, detail: { type: "string" } },
+        required: ["title", "detail"],
+      },
+    },
+  },
+  required: ["findings"],
+};
 
-phase("Hunt");
-while (dry < 2 && round < maxRounds) {           // two layered exits in one condition
-  round += 1;
-  const known = all.map((f) => f.title).join("; ");
-  const { findings } = await agent<{ findings: { title: string; detail: string }[] }>(
-    `Find issues NOT already in this list; return only NEW ones, empty if none remain.
-Known: ${known || "(none yet)"}\n\nMaterial:\n${text}`,
-    { schema: FINDINGS_SCHEMA },
-  );
-  let added = 0;
-  for (const f of findings) {
-    const key = f.title.trim().toLowerCase();
-    if (key && !seen.has(key)) { seen.add(key); all.push(f); added += 1; }
+export default async function run(input: Job): Promise<{ rounds: number; found: number }> {
+  const maxRounds = input.maxRounds ?? 8;
+  const seen = new Set<string>();
+  const all: { title: string; detail: string }[] = [];
+  let dry = 0;
+  let round = 0;
+
+  phase("Hunt");
+  while (dry < 2 && round < maxRounds) {           // two layered exits in one condition
+    round += 1;
+    const known = all.map((f) => f.title).join("; ");
+    const { findings } = await agent<{ findings: { title: string; detail: string }[] }>(
+      `Find issues NOT already in this list; return only NEW ones, empty if none remain.
+Known: ${known || "(none yet)"}\n\nMaterial:\n${input.text}`,
+      { schema: FINDINGS_SCHEMA },
+    );
+    let added = 0;
+    for (const f of findings) {
+      const key = f.title.trim().toLowerCase();
+      if (key && !seen.has(key)) { seen.add(key); all.push(f); added += 1; }
+    }
+    dry = added === 0 ? dry + 1 : 0;               // count empty rounds; stop after 2 in a row
   }
-  dry = added === 0 ? dry + 1 : 0;               // count empty rounds; stop after 2 in a row
+  return { rounds: round, found: all.length };     // the return is the run's output
 }
-output({ rounds: round, found: all.length });
+```
+
+With a `workflow.jsonc` beside it declaring the backstop:
+
+```jsonc
+{
+  "$schema": "https://boardwalk.sh/schemas/workflow.json",
+  "slug": "loop-until-done",
+  "triggers": [{ "kind": "manual" }],
+  "budget": { "max_usd": 2 },        // a non-negotiable exit (see below)
+}
 ```
 
 Dedupe in **code**, never by trusting the model not to repeat itself. Everything below makes a loop
@@ -70,17 +94,23 @@ budget is gone. Don't rely on one exit; **layer** them so no single failure runs
    verifier (next section), not by the agent grading itself.
 2. **A hard iteration cap**: a plain `round < maxRounds` bound, so a non-converging loop still
    terminates.
-3. **A budget**: set `budget.max_usd` (and `max_duration_seconds`) in `meta`. Breaching a budget
-   *terminates* the run; it doesn't truncate silently.
+3. **A budget**: set `budget` in `workflow.jsonc`. Breaching a cap **pauses** the run for a human to
+   raise it or cancel; it never truncates silently.
 4. **No-progress detection**: if a round adds nothing new, count it and bail after a few in a row. A
    loop confidently spinning in place is worse than one that stops.
 
+```jsonc
+"budget": { "max_usd": 5, "max_compute_seconds": 1800 },  // the runaway backstop
+```
+
+A loop that would rather finish cleanly than park mid-round can self-govern with `usage.get()` and
+wind down while there's still headroom:
+
 ```ts
-export const meta = {
-  slug: "nightly-cleanup",
-  triggers: [{ kind: "manual" }],
-  budget: { max_usd: 5, max_duration_seconds: 1800 },  // the runaway backstop
-} satisfies WorkflowMeta;
+import { usage } from "@boardwalk-labs/workflow";
+
+const { usd } = await usage.get();               // { spent, cap, remaining } per dimension
+if (usd.remaining !== null && usd.remaining < 0.25) break;   // wrap up under the cap
 ```
 
 ## One long run, or many short ones
@@ -97,17 +127,22 @@ whether it's *one converging job* or an *open-ended cadence*.
   independently-billed-and-capped run; a crash on one tick doesn't kill the schedule. State carries
   between runs in a persistent workspace (next section) or is re-derived from the source of truth.
 
-```ts
-export const meta = {
-  slug: "repo-maintainer",
-  triggers: [{ kind: "cron", expr: "0 3 * * *", timezone: "America/Anchorage" }],
-  budget: { max_usd: 5 },
-  workspace: { persist: ["state"] },   // carry progress between nightly runs
-  concurrency: { mode: "serial" },     // never let two ticks clobber that state
-} satisfies WorkflowMeta;
+```jsonc
+{
+  "$schema": "https://boardwalk.sh/schemas/workflow.json",
+  "slug": "repo-maintainer",
+  "triggers": [{ "kind": "cron", "expr": "0 3 * * *", "timezone": "America/Anchorage" }],
+  "budget": { "max_usd": 5 },
+  "workspace": { "persist": ["state"] },   // carry progress between nightly runs
+  "concurrency": { "mode": "serial" },     // never let two ticks clobber that state
+}
 ```
 
-For a **fixed** cadence, the `cron` trigger in `meta` is all you need. Reach for
+A maintainer like this usually **returns nothing**: its product is the state it writes and the
+record in the run log, and a `void` return (output `null`) is first-class. Return a summary object
+only when a caller actually reads it.
+
+For a **fixed** cadence, the `cron` trigger in `workflow.jsonc` is all you need. Reach for
 `workflows.schedule(slug, input, { cron })` (or `{ rate }` / `{ at }`) **only** when the schedule is
 computed at runtime, or one workflow schedules another. It is the dynamic version of the same
 pipeline, not a different one.
@@ -128,7 +163,7 @@ best-practice nice-to-have? Default to real:false if unsure.\nClaim: ${c.title}\
       { schema: VERDICT_SCHEMA },
     )),
 );
-const confirmed = candidates.filter((_, i) => verdicts[i].real);
+const confirmed = candidates.filter((_, i) => verdicts[i]?.real);
 ```
 
 Verification re-reads the work once per item, so it roughly **doubles** the loop's tokens: the right
@@ -143,7 +178,7 @@ already did or it repeats itself. Turn on a persistent workspace and read/write 
 
 ```ts
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-// meta.workspace = { persist: ["state"] }; meta.concurrency = { mode: "serial" };
+// workflow.jsonc: "workspace": { "persist": ["state"] }, "concurrency": { "mode": "serial" }
 
 // Your program runs IN the workspace, so relative paths are the workspace.
 const donePath = "state/done.json";
@@ -153,13 +188,15 @@ mkdirSync("state", { recursive: true });
 writeFileSync(donePath, JSON.stringify(done));
 ```
 
-Name the directories that carry (`persist: ["state"]`) rather than `persist: true`. `true` keeps the
+Name the directories that carry (`"persist": ["state"]`) rather than `true`. `true` keeps the
 WHOLE workspace, so a loop that clones a repo or runs `npm install` ships all of it to storage on
 every tick — toward the 512 MB snapshot cap and your storage bill. A loop's compounding state is
 usually small; say which part it is.
 
-Persisted state is **last-writer-wins**, so pin `concurrency: { mode: "serial" }` whenever a loop
-shares it. For work that must never be redone on a restart, put it behind `workflows.call(slug,
+Persisted state is **last-writer-wins**, so pin `"concurrency": { "mode": "serial" }` whenever a
+loop shares it — or serialize per entity with a runtime key
+(`{ "mode": "serial", "key": "queue-${input.queueId}" }`) so independent queues still run in
+parallel. For work that must never be redone on a restart, put it behind `workflows.call(slug,
 input)`: a restarted parent re-attaches to the existing child result instead of running it again.
 
 ## Don't pay to wait
@@ -169,7 +206,7 @@ the machine** and re-acquires one on wake, and a human gate does the same. Idle 
 a loop can park overnight on an approval or poll for a week and cost nothing in between.
 
 ```ts
-import { sleep, humanInput } from "@boardwalk-labs/workflow";
+import { humanInput, sleep, workflows } from "@boardwalk-labs/workflow";
 
 for (;;) {
   if (await isHealthy(url)) break;
@@ -188,7 +225,7 @@ if (ok.value === "approve") await workflows.call("open-pr", { /* ... */ });
 Use the `boardwalk` CLI (see `boardwalk-use-cli`):
 
 ```bash
-boardwalk check .                                   # validate the program (no auth/network)
+boardwalk check .                                   # validate the package (no auth/network)
 boardwalk run . --org <slug> --input '{"text":"..."}' # deploy + trigger + wait
 boardwalk runs <id> --logs                          # read what each round did
 ```
@@ -198,13 +235,13 @@ loop) and `--template loop-with-verify` (the same loop plus the separate checker
 
 ## Checklist for a good loop
 
-- [ ] **Exits are layered:** a goal/verifier check, a hard `maxRounds`, `budget.max_usd`, and
-      no-progress detection. Never just one.
+- [ ] **Exits are layered:** a goal/verifier check, a hard `maxRounds`, a `budget` in
+      `workflow.jsonc`, and no-progress detection. Never just one.
 - [ ] **Topology matches the job:** one run for a bounded goal; a `cron` trigger for an open-ended
       cadence; `workflows.schedule` only for a runtime-computed schedule.
 - [ ] **The checker is a separate agent**, prompted to refute; the maker never grades itself.
 - [ ] **Dedupe and route in code**, not in another `agent()` call.
-- [ ] **Recurring loops persist state** (`workspace: { persist: ["state"] }` + `concurrency: serial`)
-      or re-derive it from the source of truth.
+- [ ] **Recurring loops persist state** (`"workspace": { "persist": ["state"] }` +
+      `"concurrency": { "mode": "serial" }`) or re-derive it from the source of truth.
 - [ ] **Waits use `sleep`/`humanInput`**, never a busy-wait; idle time should be free.
 - [ ] **Secrets stay in code** (`secrets.get`), never in an agent prompt.
