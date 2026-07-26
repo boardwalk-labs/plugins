@@ -226,7 +226,7 @@ Use the `boardwalk` CLI (see `boardwalk-use-cli`):
 
 ```bash
 boardwalk check .                                   # validate the package (no auth/network)
-boardwalk run . --org <slug> --input '{"text":"..."}' # deploy + trigger + wait
+boardwalk deploy . --org <slug> --run --input '{"text":"..."}' # deploy + trigger + wait
 boardwalk runs <id> --logs                          # read what each round did
 ```
 

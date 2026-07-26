@@ -33,7 +33,7 @@ boardwalk --help
 
 ## The author loop
 
-The CLI is built around a tight loop: **scaffold → validate → run → inspect.** Iterate with `boardwalk check` (validate the package, no auth), `boardwalk run . --org <org>` (deploy + trigger a real run), and `boardwalk runs <id> --logs`/`--follow` (inspect it). There is no local run mode: unit tests call `run(input)` directly over `installTestHost` stubs, and live execution is deploy + trigger — point it at a dev environment with `--environment` while iterating. To run workflows on your own machine, use a self-hosted runner (`boardwalk runner`, below).
+The CLI is built around a tight loop: **scaffold → validate → run → inspect.** Iterate with `boardwalk check` (validate the package, no auth), `boardwalk deploy . --org <org> --run` (deploy + trigger a real run), and `boardwalk runs <id> --logs`/`--follow` (inspect it). There is no local run mode: unit tests call `run(input)` directly over `installTestHost` stubs, and live execution is deploy + trigger — point it at a dev environment with `--environment` while iterating. To run workflows on your own machine, use a self-hosted runner (`boardwalk runner`, below).
 
 ### `boardwalk init [dir]`: scaffold a project
 
@@ -95,12 +95,21 @@ boardwalk deploy . --yes                     # CI: skip the create confirmation
 
 The org is resolved deterministically, never guessed: `--org` wins; else a single-org credential's scope is unambiguous; else the project link (below); else a hard error listing your orgs. A deploy that would **create** a new workflow confirms interactively first (`--yes` skips, for CI); updates never prompt. The workflow's identity is `(org, slug)` — the descriptor carries no org, so a fork deploys to whoever runs it. The server derives the I/O schemas from your `run` signature and prints any derivation warnings.
 
-### `boardwalk run <dir>`: deploy, trigger a real run, wait for the result
+### `boardwalk run <workflow>`: run a DEPLOYED workflow, wait for the result
 
 ```bash
-boardwalk run . --org my-team --input '{"who":"world"}'   # --input becomes run(input)
-boardwalk run . --org my-team --no-wait                   # trigger and exit without waiting
-boardwalk run . --org my-team --environment Production    # run against an environment (its secrets + variables)
+boardwalk run my-workflow --input '{"who":"world"}'      # --input becomes run(input)
+boardwalk run my-workflow --no-wait                      # trigger and exit without waiting
+boardwalk run my-workflow --environment Production       # run against an environment (its secrets + variables)
+boardwalk run 01KV4SMQ0JFCNH9X4VQVW10STZ                 # by id, as in a dashboard URL
+```
+
+`<workflow>` is a **slug or a workflow id**, not a directory: `run` reads nothing from disk — no package, no build, no deploy — so it works from any machine that has a login, on a workflow you have no local copy of. Pass `--org` only when your login covers more than one org.
+
+While authoring, `boardwalk deploy <dir> --run` does both in one step (it takes the same `--input` / `--environment` / `--no-wait`):
+
+```bash
+boardwalk deploy . --org my-team --run --input '{"who":"world"}'
 ```
 
 `--environment <name>` picks which environment's secrets and variables the run resolves (omit = the org base). See `boardwalk environments` / `boardwalk variables` below.
@@ -193,7 +202,7 @@ Writing or deleting secrets needs `boardwalk login --scopes admin`. `--scope` is
 
 ### `boardwalk environments` / `boardwalk variables`: environment config (GitHub-Actions style)
 
-The org keeps **secrets** (encrypted credentials, read in code via `secrets.get`) and non-secret **variables** (injected into the run as `process.env`), organized into **environments**. The **organization base** applies to every run; a named **environment** (e.g. `Production`) holds its own secrets + variables. A run **targets one environment** and resolves its config from it, **falling back to the org base**. The same name can hold a different value per environment. Pick the environment per run with `boardwalk run --environment <name>` (omit = the org base); it is NOT a descriptor field.
+The org keeps **secrets** (encrypted credentials, read in code via `secrets.get`) and non-secret **variables** (injected into the run as `process.env`), organized into **environments**. The **organization base** applies to every run; a named **environment** (e.g. `Production`) holds its own secrets + variables. A run **targets one environment** and resolves its config from it, **falling back to the org base**. The same name can hold a different value per environment. Pick the environment per run with `boardwalk run <workflow> --environment <name>` (omit = the org base); it is NOT a descriptor field.
 
 ```bash
 boardwalk environments                       # named environments (the org base always applies underneath)
@@ -258,7 +267,8 @@ The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/p
 | `boardwalk login [--scopes admin] [--token bwk_...]` | Authenticate (browser OAuth, or store an API key) |
 | `boardwalk whoami` / `boardwalk status` / `boardwalk logout` | Inspect / verify / clear credentials |
 | `boardwalk deploy <dir> [--org <slug>] [--dry-run] [--yes]` | Create or update a workflow |
-| `boardwalk run <dir> [--org <slug>] [--input <json>] [--environment <name>] [--no-wait]` | Deploy + trigger a real run |
+| `boardwalk run <workflow> [--org <slug>] [--input <json>] [--environment <name>] [--no-wait]` | Run a DEPLOYED workflow (slug or id; no local copy) |
+| `boardwalk deploy <dir> --run [--input <json>] [--environment <name>]` | Ship it, then run it once (the authoring loop) |
 | `boardwalk cancel <runId>` | Cancel a queued or in-flight run |
 | `boardwalk runs [runId] [--logs] [--follow] [--json]` | List runs, show one, or stream its log |
 | `boardwalk inputs [runId] [--json]` | List human-in-the-loop inputs awaiting a response |

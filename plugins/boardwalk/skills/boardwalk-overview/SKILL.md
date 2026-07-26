@@ -81,7 +81,7 @@ contract) beside the same `workflow.jsonc`.
 
 Deploy it to Boardwalk and the platform runs it — on its schedule, webhook, or API, with durability
 and model routing handled for you. Iterate with `boardwalk check` (validate the package locally),
-`boardwalk run . --org <org>` (deploy + trigger a real run), and `boardwalk runs <id> --logs`.
+`boardwalk deploy . --org <org> --run` (deploy + trigger a real run), and `boardwalk runs <id> --logs`.
 There is no local run mode: unit tests call `run(input)` directly over `installTestHost` stubs, and
 live execution is a real run, pointed at a dev environment when you're iterating.
 
