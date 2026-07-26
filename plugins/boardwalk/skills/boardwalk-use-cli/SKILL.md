@@ -73,14 +73,14 @@ Every engine emits the same typed event stream on five channels: `lifecycle`, `p
 
 ```bash
 boardwalk login                   # browser OAuth (PKCE) → stores a least-privilege session
-boardwalk login --scopes admin    # elevated session: manage secrets/providers, delete workflows
+boardwalk login --scopes admin    # elevated session: manage secrets and inference providers
 boardwalk login --token bwk_xxx   # store an API key instead of the browser flow
 boardwalk whoami                  # show the current stored session + the account's orgs
 boardwalk status                  # API host + login (verified live) + project link
 boardwalk logout                  # remove local credentials
 ```
 
-`login` opens a browser for an OAuth PKCE flow and stores a scoped session locally. The default login is least-privilege (deploy, trigger, read runs, list secret/provider names). Writing secrets, wiring inference providers, and deleting workflows need `--scopes admin` (you must be an org admin). For headless/CI use, pass an API key (`bwk_...`) with `--token`, or set `BOARDWALK_API_KEY`.
+`login` opens a browser for an OAuth PKCE flow and stores a scoped session locally. The default login is least-privilege (deploy, trigger, read runs, list secret/provider names). Writing secrets and wiring inference providers need `--scopes admin` (you must be an org admin); admin-only actions like deleting a workflow work from any login, gated on your org role. For headless/CI use, pass an API key (`bwk_...`) with `--token`, or set `BOARDWALK_API_KEY`.
 
 ## Ship it
 
