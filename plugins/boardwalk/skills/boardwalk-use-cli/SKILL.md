@@ -54,7 +54,9 @@ Creates the two-file package: `workflow.jsonc`, `src/index.ts` (typed `run` func
 boardwalk check .
 ```
 
-Everything a deploy does except the upload, all local: validates `workflow.jsonc` against the descriptor schema (the same one the server enforces, including the `concurrency.key` template syntax), esbuild-compiles the entry proving every import resolves (strip-only — your body is never type-checked), and packs the artifact. The I/O schemas derive at deploy (the backend reads the `run()` signature and returns warnings). No auth, no network, so it is safe in CI on every commit. `deploy` and `run` run the same validation.
+Everything a deploy does except the upload, all local: validates `workflow.jsonc` against the descriptor schema (the same one the server enforces, including the `concurrency.key` template syntax), esbuild-compiles the entry proving every import resolves (strip-only — your body is never type-checked), and packs the artifact. The I/O schemas derive at deploy (the backend reads the `run()` signature and returns warnings). No auth, no network, so it is safe in CI on every commit. `deploy` and `build` run the same validation.
+
+A **Python** package resolves and freezes its dependencies here, so `check` needs `uv` on PATH — and a reasonably current one. The build always resolves wheels for the runner's CPython and platform, not yours, so your own Python version doesn't matter; but when a package has no matching wheel, uv falls back to building it from source *for your machine*, and that layer can't import on the runner.
 
 ### `boardwalk build <dir>`: build the deploy artifact
 
@@ -94,6 +96,8 @@ boardwalk deploy . --yes                     # CI: skip the create confirmation
 ```
 
 The org is resolved deterministically, never guessed: `--org` wins; else a single-org credential's scope is unambiguous; else the project link (below); else a hard error listing your orgs. A deploy that would **create** a new workflow confirms interactively first (`--yes` skips, for CI); updates never prompt. The workflow's identity is `(org, slug)` — the descriptor carries no org, so a fork deploys to whoever runs it. The server derives the I/O schemas from your `run` signature and prints any derivation warnings.
+
+**Python packages deploy only from here.** The MCP tools and the web Code tab build server-side, which can't materialize a Python dependency layer, so they refuse a `.py` package (the web Code tab renders it read-only). TypeScript deploys from all three.
 
 ### `boardwalk run <workflow>`: run a DEPLOYED workflow, wait for the result
 
