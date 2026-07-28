@@ -86,7 +86,9 @@ whose product is its side effects.
 `workflow.jsonc` is policy the platform enforces around your code, read as data (comments and
 trailing commas welcome; never executed). The fields worth knowing: `slug` (required, the stable
 identity), `triggers` (required: `cron`, `webhook`, `manual`, or `workflow_run` — a `cron` trigger
-may add a static `input` object passed to every scheduled run), `permissions` (the `secrets`
+may add a static `input` object passed to every scheduled run, and a `webhook` trigger NAMES one of
+the org's webhooks, `{ "kind": "webhook", "name": "stripe-prod" }`, created once with
+`boardwalk webhooks create`), `permissions` (the `secrets`
 allowlist a run may `secrets.get`; `id_token` for `auth.idToken`), `budget` (`max_usd`,
 `max_tokens`, `max_compute_seconds` — all metered; a breach pauses the run for approval, never a
 hard kill), `concurrency` (`unlimited` default, `serial`, or per-entity
