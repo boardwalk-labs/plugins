@@ -183,14 +183,20 @@ boardwalk workspace reset my-flow --yes     # clear it; the workflow, triggers, 
 
 A workflow opts into persistence with `"workspace": { "persist": [...] }` in `workflow.jsonc` or an `agent({ memory })` call. Reset exists because state that compounds eventually compounds something wrong (a poisoned cache, a memory that learned the wrong lesson); `--environment` addresses one environment's copy.
 
-### `boardwalk webhook <id|slug>`: inbound webhook URL
+### `boardwalk webhooks`: the org's inbound endpoints
 
 ```bash
-boardwalk webhook <id|slug>                 # show the inbound URL + verification scheme (no secret)
-boardwalk webhook <id|slug> --rotate        # regenerate the secret and reveal it ONCE (admin)
+boardwalk webhooks                          # list: name, URL, verification scheme (no secrets)
+boardwalk webhooks create <name>            # create one; the signing secret is shown ONCE (admin)
+boardwalk webhooks rotate <name>            # new secret, shown ONCE; the old one stops working
+boardwalk webhooks delete <name> --yes      # remove it and its secret (admin)
 ```
 
-The **secret is never in the URL**. The URL is the bare workflow endpoint, safe to share. The secret rides in a header per the trigger's verifier preset: `token` sends it verbatim in `X-Boardwalk-Token`, `custom_header` in a caller-named header, `signature` as an HMAC-SHA256 of the raw body in `X-Boardwalk-Signature: sha256=<hex>`, and the provider presets (`github`/`stripe`/`slack`/`linear`) verify that provider's own signing scheme. Plain `webhook <ref>` prints the endpoint and scheme but no secret; `--rotate` (admin-gated) mints a new secret, invalidates the old one, and reveals the new value a single time, so reconfigure the sender afterward. A workflow gets a webhook by declaring `{ "kind": "webhook", "auth": "token" }` (or another preset) in the descriptor's `triggers`.
+A webhook is an **org-level endpoint**, not a property of a workflow: create it once, point a sender at its URL, then attach any number of workflows with `{ "kind": "webhook", "name": "<name>" }` in the descriptor's `triggers`. **Every attached workflow runs on every delivery** — to split events between workflows, create a second webhook and choose which events go where on the sender's side (Stripe, Sentry, PagerDuty and most senders have an event picker).
+
+The **secret is never in the URL**. It rides in a header per the webhook's verification preset: `token` sends it verbatim in `X-Boardwalk-Token`, `custom_header` in a header you name, `signature` as an HMAC-SHA256 of the raw body in `X-Boardwalk-Signature: sha256=<hex>`, and the provider presets (`github`/`stripe`/`slack`/`linear`/`sentry`/`pagerduty`/`standard_webhooks`) verify that sender's own scheme — for those, pass the sender's key with `--secret` (or `--secret -` to read stdin) rather than minting one.
+
+Naming a webhook the org hasn't created yet is **not** a deploy failure: the workflow deploys and shows as not-connected until you create it.
 
 ### `boardwalk secrets`: manage the org's secrets (values never returned)
 
@@ -280,7 +286,7 @@ The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/p
 | `boardwalk usage [--org <slug>] [--days <n>] [--json]` | Org spend and activity |
 | `boardwalk workflows [list\|show\|disable\|enable\|delete] ...` | Inspect and manage workflows |
 | `boardwalk workspace [show\|reset] <workflow> ...` | Inspect / clear a workflow's persistent workspace |
-| `boardwalk webhook <id\|slug> [--rotate]` | Show / rotate a workflow's inbound webhook URL |
+| `boardwalk webhooks [create\|rotate\|delete]` | Manage the org's inbound webhook endpoints |
 | `boardwalk secrets [list\|set\|delete] ...` | Manage the org's secrets (admin to write) |
 | `boardwalk environments [list\|create\|delete] ...` | Manage named environments (config sets a run targets) |
 | `boardwalk variables [list\|set\|delete] [--environment <name>] ...` | Manage non-secret variables (`process.env`) |
