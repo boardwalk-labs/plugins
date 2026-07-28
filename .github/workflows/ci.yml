@@ -84,11 +84,13 @@ jobs:
     name: Skills reference no deleted SDK APIs
     # Guards against the skills drifting behind the SDK: when an API is removed
     # from @boardwalk-labs/workflow, an agent that follows a stale skill writes to
-    # a deleted symbol. This denylist is the determinism tax deleted in SDK 0.2.0
-    # (durable now/random/uuid, step.run, the lint flag). Extend it whenever a
-    # public SDK export is removed. Deliberately does NOT ban the word
-    # "determinism" — the current skills legitimately say "there is no determinism
-    # gate."
+    # a deleted symbol. Two generations of deletion are covered: the determinism
+    # tax (SDK 0.2.0 — durable now/random/uuid, step.run, the lint flag) and the
+    # function-model redesign (SDK 0.3.0 — the `meta` literal and `output()` gave
+    # way to `workflow.jsonc` + `return`), plus `boardwalk dev`, the local run mode
+    # removed from the CLI. Extend it whenever a public SDK export or command is
+    # removed. Deliberately does NOT ban the word "determinism" — the current
+    # skills legitimately say "there is no determinism gate."
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -97,11 +99,13 @@ jobs:
           set -euo pipefail
           # Substrings that only ever named a now-deleted SDK surface.
           banned='step\.run|allow-nondeterminism|durable `?(now|random|uuid)`?\(\)'
+          banned="$banned"'|export const meta|agents\.spawn|boardwalk dev\b|\boutput\('
           hits="$(grep -rnE "$banned" $(find plugins -name SKILL.md) || true)"
           if [ -n "$hits" ]; then
-            echo "::error::a skill references an SDK API deleted in 0.2.0 (the determinism tax):"
+            echo "::error::a skill references a deleted SDK API or CLI command:"
             printf '%s\n' "$hits"
-            echo "Rewrite to the live model (plain TypeScript; snapshot-resume; restart-from-top)."
+            echo "Rewrite to the live model (workflow.jsonc + a run() that returns; plain"
+            echo "TypeScript; snapshot-resume; restart-from-top; deploy+trigger, no local run)."
             exit 1
           fi
           echo "ok: no deleted-API references in any SKILL.md"
