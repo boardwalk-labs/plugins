@@ -198,6 +198,8 @@ The **secret is never in the URL**. It rides in a header per the webhook's verif
 
 Naming a webhook the org hasn't created yet is **not** a deploy failure: the workflow deploys and shows as not-connected until you create it.
 
+For **GitHub, Linear, Jira and Notion** there is no webhook to create at all: those are provider triggers (`{ "kind": "github", "event": "pr.merged" }`), and the platform owns the subscription, the verification, and the dedupe. Connecting is an OAuth or app-install flow in the browser, so **there is no `boardwalk connections` command** — send the user to **Connections** in the dashboard, where the same page carries the inbound-delivery log and replay. A workflow declaring one deploys before the connection exists. See `write-good-workflows` for the event vocabularies.
+
 ### `boardwalk secrets`: manage the org's secrets (values never returned)
 
 ```bash

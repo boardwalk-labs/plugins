@@ -85,9 +85,10 @@ whose product is its side effects.
 
 `workflow.jsonc` is policy the platform enforces around your code, read as data (comments and
 trailing commas welcome; never executed). The fields worth knowing: `slug` (required, the stable
-identity), `triggers` (required: `cron`, `webhook`, `manual`, or `workflow_run` — a `cron` trigger
-may add a static `input` object passed to every scheduled run, and a `webhook` trigger NAMES one of
-the org's webhooks, `{ "kind": "webhook", "name": "stripe-prod" }`, created once with
+identity), `triggers` (required: `cron`, `webhook`, `manual`, `workflow_run`, or a provider event —
+`github`, `linear`, `jira`, `notion`. A `cron` trigger may add a static `input` object passed to
+every scheduled run, and a `webhook` trigger NAMES one of the org's webhooks,
+`{ "kind": "webhook", "name": "stripe-prod" }`, created once with
 `boardwalk webhooks create`), `permissions` (the `secrets`
 allowlist a run may `secrets.get`; `id_token` for `auth.idToken`), `budget` (`max_usd`,
 `max_tokens`, `max_compute_seconds` — all metered; a breach pauses the run for approval, never a
@@ -95,6 +96,21 @@ hard kill), `concurrency` (`unlimited` default, `serial`, or per-entity
 `{ "mode": "serial", "key": "refund-${input.customerId}" }`), `workspace` (directories to persist
 between runs), and `runs_on` (the machine, default `boardwalk/linux`). The workflow declares **no**
 model and no I/O schemas — those come from your types.
+
+**Provider triggers.** `github`, `linear`, `jira` and `notion` fire on a connected provider's events
+with no URL and no secret to manage: `{ "kind": "github", "event": "pr.merged", "repos": ["acme/app"] }`
+(`repos` optional, GitHub only), `{ "kind": "linear", "event": "issue.status_changed" }`. The
+vocabularies are semantic outcomes, never raw vendor actions — GitHub: `pr.opened` / `pr.merged` /
+`issue.opened` / `issue.commented` / `ci.completed`; Linear and Jira: `issue.created` /
+`issue.status_changed` / `issue.commented`; Notion: `page.created` / `page.updated` /
+`comment.created`. Anything else means a plain `webhook` trigger instead. Three things to tell the
+user: the workflow **deploys before** the org has connected the provider (it shows needs-connection,
+never a deploy failure, so a package stays portable), the run input is a curated typed projection of
+the vendor payload (always `input.event` and `deliveryId`, plus `pr` / `issue` / `comment` /
+`entity`) rather than the raw object, and a Notion payload carries **ids only**, so that program has
+to fetch the content itself. The trigger plane vends no provider tokens: anything the program does
+back to the provider uses the org's own credential via `secrets.get` or an MCP connection. Connect
+is a browser flow in the dashboard, so there is no CLI command for it.
 
 ## The workspace
 
