@@ -1,11 +1,11 @@
 {
   "name": "boardwalk",
   "displayName": "Boardwalk",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Boardwalk for Cursor: CLI-first agent-workflow authoring and deploys.",
   "author": {
     "name": "Boardwalk Labs",
-    "email": "hello@boardwalk.sh",
+    "email": "team@boardwalk.sh",
     "url": "https://boardwalk.sh"
   },
   "license": "MIT",

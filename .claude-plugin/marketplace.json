@@ -2,21 +2,21 @@
   "name": "boardwalk-labs",
   "owner": {
     "name": "Boardwalk Labs",
-    "email": "hello@boardwalk.sh"
+    "email": "team@boardwalk.sh"
   },
   "metadata": {
     "description": "Official Boardwalk plugins for Claude Code.",
-    "version": "0.1.17"
+    "version": "0.1.18"
   },
   "plugins": [
     {
       "name": "boardwalk",
       "source": "./",
-      "version": "0.1.17",
+      "version": "0.1.18",
       "description": "CLI-first Boardwalk workflows for Claude Code.",
       "author": {
         "name": "Boardwalk Labs",
-        "email": "hello@boardwalk.sh"
+        "email": "team@boardwalk.sh"
       },
       "homepage": "https://boardwalk.sh",
       "repository": "https://github.com/boardwalk-labs/plugins",
