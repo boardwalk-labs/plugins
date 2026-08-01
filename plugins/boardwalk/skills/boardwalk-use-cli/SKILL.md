@@ -44,7 +44,9 @@ boardwalk init my-workflow --python # a Python workflow (main.py + pyproject.tom
 boardwalk init my-workflow --template <name>
 ```
 
-Creates the two-file package: `workflow.jsonc`, `src/index.ts` (typed `run` function), `README.md`, `package.json`, `tsconfig.json`, and `.gitignore`. `--python` swaps in `main.py` + `pyproject.toml` (dependencies resolve with `uv` at build time). `--template <name>` selects the starting point from the examples registry and defaults to the built-in `hello`, which works offline. It also drops the Boardwalk agent skills into `.claude/skills/` so a coding agent working in the project has local context. It never overwrites existing files, and keeps a `README.md` you already have.
+Creates the two-file package: `workflow.jsonc`, `src/index.ts` (typed `run` function), `README.md`, `package.json`, `tsconfig.json`, and `.gitignore`. `--python` swaps in `main.py` + `pyproject.toml` (dependencies resolve with `uv` at build time). `--template <name>` selects the starting point from the examples registry and defaults to the built-in `hello`, which works offline. It writes the package and nothing else: it does not vendor skills into `.claude/`, so if the project's agent needs the CLI in context, install the plugin (`claude plugin install boardwalk@boardwalk-labs`). It never overwrites existing files, and keeps a `README.md` you already have.
+
+The scaffold is deliberately minimal: a `manual` trigger and one `agent()` call, no commented-out options. Reach for the JSON schema (`https://boardwalk.sh/schemas/workflow.json`, which every field describes) rather than expecting the generated file to enumerate what is available.
 
 **Fill in the scaffolded `README.md`.** It ships with the package on every deploy and becomes the workflow's landing page in the dashboard, beside the config from `workflow.jsonc`. It is the only place a reader learns what the workflow is *for*: the descriptor can say how it is configured and nothing more. See `write-good-workflows` for what belongs in it.
 
