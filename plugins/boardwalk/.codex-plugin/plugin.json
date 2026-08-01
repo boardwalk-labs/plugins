@@ -1,6 +1,6 @@
 {
   "name": "boardwalk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "CLI-first Boardwalk workflows for Codex.",
   "author": {
     "name": "Boardwalk Labs",
@@ -15,14 +15,14 @@
   "interface": {
     "displayName": "Boardwalk",
     "shortDescription": "Author and ship Boardwalk agent workflows from Codex.",
-    "longDescription": "A thin Codex plugin bundling CLI-oriented skills for installing and driving the `boardwalk` CLI — scaffold a workflow, run it locally, validate it, deploy it, and trigger real runs.",
+    "longDescription": "A thin Codex plugin bundling CLI-oriented skills for installing and driving the `boardwalk` CLI — scaffold a workflow, validate it, deploy it, trigger real runs, and follow the logs.",
     "developerName": "Boardwalk Labs",
     "category": "Productivity",
     "capabilities": ["Interactive", "Read", "Write"],
     "websiteURL": "https://boardwalk.sh",
     "defaultPrompt": [
       "Install the Boardwalk CLI and scaffold a new workflow.",
-      "Run my Boardwalk workflow locally and show the output.",
+      "Validate my Boardwalk workflow package and fix whatever it reports.",
       "Deploy this workflow to my Boardwalk org and trigger a run."
     ],
     "brandColor": "#2e74f3"

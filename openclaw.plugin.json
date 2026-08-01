@@ -1,7 +1,7 @@
 {
   "id": "boardwalk",
   "name": "Boardwalk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "CLI-first Boardwalk workflows for OpenClaw.",
   "skills": ["./plugins/boardwalk/skills/boardwalk-use-cli"],
   "configSchema": {
