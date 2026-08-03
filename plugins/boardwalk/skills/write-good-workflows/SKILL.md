@@ -78,8 +78,9 @@ input can be hostile. The **return** is validated against your declared type aut
 mismatch fails the run — and a `void` return persists `null`, which is first-class for a workflow
 whose product is its side effects.
 
-`context` (param 1, declare it only when needed) is read-only metadata: `runId`, `trigger`, `actor`,
-`attempt`, `environment`, `workspaceDir`, `signal`. Data only — everything that acts is an import.
+`context` (param 1, declare it only when needed) is read-only metadata: `runId`, `workflowId`,
+`workflowVersion`, `orgId`, `trigger`, `actor`, `attempt`, `environment` (`{ id, name }`, or `null`
+for the org base), `workspaceDir`, `signal`. Data only — everything that acts is an import.
 
 ## The descriptor
 

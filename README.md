@@ -75,7 +75,7 @@ export BOARDWALK_API_KEY=bwk_...
 
 Restart Claude Code (or run `/mcp` and reconnect) after setting it. Without the variable the skills still work; only the MCP connection needs it.
 
-Other harnesses connect the same server manually, for example:
+Any MCP-capable harness can connect the same server manually: it is a plain HTTP MCP server at `https://api.boardwalk.sh/mcp/v1`, authenticated with an `Authorization: Bearer $BOARDWALK_API_KEY` header. Point your harness's MCP config at that URL and header; from the Claude Code CLI (outside the plugin), for example:
 
 ```bash
 claude mcp add --transport http boardwalk https://api.boardwalk.sh/mcp/v1 \

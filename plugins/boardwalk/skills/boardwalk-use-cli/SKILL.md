@@ -44,7 +44,7 @@ boardwalk init my-workflow --python # a Python workflow (main.py + pyproject.tom
 boardwalk init my-workflow --template <name>
 ```
 
-Creates the two-file package: `workflow.jsonc`, `src/index.ts` (typed `run` function), `README.md`, `package.json`, `tsconfig.json`, and `.gitignore`. `--python` swaps in `main.py` + `pyproject.toml` (dependencies resolve with `uv` at build time). `--template <name>` selects the starting point from the examples registry and defaults to the built-in `hello`, which works offline. It writes the package and nothing else: it does not vendor skills into `.claude/`, so if the project's agent needs the CLI in context, install the plugin (`claude plugin install boardwalk@boardwalk-labs`). It never overwrites existing files, and keeps a `README.md` you already have.
+Creates the two-file package: `workflow.jsonc`, `src/index.ts` (typed `run` function), `README.md`, `package.json`, `tsconfig.json`, and `.gitignore`. `--python` swaps in `main.py` + `pyproject.toml` (dependencies resolve with `uv` at build time) and cannot be combined with `--template` (hard error). `--template <name>` selects the starting point and defaults to the built-in `hello`, the only offline template; any other name fetches from the examples registry over the network. It writes the package and nothing else: it does not vendor skills into `.claude/`, so if the project's agent needs the CLI in context, install the plugin (`claude plugin install boardwalk@boardwalk-labs`). It never overwrites existing files, and keeps a `README.md` you already have.
 
 The scaffold is deliberately minimal: a `manual` trigger and one `agent()` call, no commented-out options. Reach for the JSON schema (`https://boardwalk.sh/schemas/workflow.json`, which every field describes) rather than expecting the generated file to enumerate what is available.
 
@@ -56,7 +56,7 @@ The scaffold is deliberately minimal: a `manual` trigger and one `agent()` call,
 boardwalk check .
 ```
 
-Everything a deploy does except the upload, all local: validates `workflow.jsonc` against the descriptor schema (the same one the server enforces, including the `concurrency.key` template syntax), esbuild-compiles the entry proving every import resolves (strip-only — your body is never type-checked), and packs the artifact. The I/O schemas derive at deploy (the backend reads the `run()` signature and returns warnings). No auth, no network, so it is safe in CI on every commit. `deploy` and `build` run the same validation.
+Everything a deploy does except the upload, all local: validates `workflow.jsonc` against the descriptor schema (the same one the server enforces, including the `concurrency.key` template syntax), esbuild-compiles the entry proving every import resolves, runs the package's own `tsc` (skip with `--no-typecheck`; the esbuild bundle itself is strip-only), and packs the artifact. `--no-types-harvest` skips collecting the type information the backend derives the I/O schemas from (the backend reads the `run()` signature at deploy and returns warnings). No auth, no network, so it is safe in CI on every commit. `deploy` and `build` run the same validation.
 
 A **Python** package resolves and freezes its dependencies here, so `check` needs `uv` on PATH — and a reasonably current one. The build always resolves wheels for the runner's CPython and platform, not yours, so your own Python version doesn't matter; but when a package has no matching wheel, uv falls back to building it from source *for your machine*, and that layer can't import on the runner.
 
@@ -110,7 +110,12 @@ boardwalk run my-workflow --environment Production       # run against an enviro
 boardwalk run 01KV4SMQ0JFCNH9X4VQVW10STZ                 # by id, as in a dashboard URL
 ```
 
-`<workflow>` is a **slug or a workflow id**, not a directory: `run` reads nothing from disk — no package, no build, no deploy — so it works from any machine that has a login, on a workflow you have no local copy of. Pass `--org` only when your login covers more than one org.
+`<workflow>` is a **slug or a workflow id**, not a directory: `run` reads nothing from disk — no package, no build, no deploy — so it works from any machine that has a login, on a workflow you have no local copy of. Pass `--org` only when your login covers more than one org. Add `--json` to get `{ runId, status, ... }` on stdout (progress goes to stderr).
+
+**Always pass `--input` when the workflow reads its input.** Omitted, the trigger carries NO input at
+all — not an empty object — so a `run(input)` body sees `undefined` (TS) or `None` (Python) and fails
+in a way that looks like a platform bug. When there is nothing to say, say `--input '{}'`. The same
+applies to `deploy --run`.
 
 While authoring, `boardwalk deploy <dir> --run` does both in one step (it takes the same `--input` / `--environment` / `--no-wait`):
 
@@ -139,6 +144,7 @@ boardwalk runs <runId>                      # one run's summary (status, duratio
 boardwalk runs <runId> --logs               # its event log (--verbose / --stream for tools + raw turns)
 boardwalk runs <runId> --follow             # live-tail over SSE until it finishes (Ctrl-C aborts)
 boardwalk runs <runId> --json               # raw JSON, for piping
+boardwalk runs <runId> --json-stream        # NDJSON of every channel, for piping a live run
 ```
 
 Acting on a single run by id needs no `--org`. The run resolves its own org.
@@ -166,14 +172,23 @@ boardwalk usage --org my-team --days 30 --json
 
 For a single run's live budget state from *inside* the program, the SDK's `usage.get()` is the hook (see `write-good-loops`).
 
+### `boardwalk notifications`: the org's notification feed
+
+```bash
+boardwalk notifications                     # list (the default subcommand)
+boardwalk notifications unread              # only what you haven't seen
+boardwalk notifications read <ids...>       # mark specific ones read (--all for everything)
+```
+
 ### `boardwalk workflows`: inspect and manage
 
 ```bash
 boardwalk workflows                         # the org's workflows (slug, title, triggers, last run)
-boardwalk workflows show <id|slug>          # manifest projection + version history
+boardwalk workflows -q digest               # filter by slug/title
+boardwalk workflows show <id|slug>          # manifest projection + version history (--source lists files)
 boardwalk workflows disable <id|slug>       # pause every trigger (reversible)
 boardwalk workflows enable <id|slug>        # resume a disabled workflow's triggers
-boardwalk workflows delete <id|slug> --yes  # irreversible; needs an elevated login
+boardwalk workflows delete <id|slug> --yes  # irreversible; gated on your org role, any login
 ```
 
 ### `boardwalk workspace`: a workflow's persistent state
@@ -183,7 +198,7 @@ boardwalk workspace show my-flow            # what it's storing, per environment
 boardwalk workspace reset my-flow --yes     # clear it; the workflow, triggers, and history stay
 ```
 
-A workflow opts into persistence with `"workspace": { "persist": [...] }` in `workflow.jsonc` or an `agent({ memory })` call. Reset exists because state that compounds eventually compounds something wrong (a poisoned cache, a memory that learned the wrong lesson); `--environment` addresses one environment's copy.
+A workflow opts into persistence with `"workspace": { "persist": [...] }` in `workflow.jsonc` or an `agent({ memory })` call. `show` reports every environment's copy at once (it takes no `--environment`). Reset exists because state that compounds eventually compounds something wrong (a poisoned cache, a memory that learned the wrong lesson); `reset --environment` addresses one environment's copy, and `reset --key <key>` clears a single entry.
 
 ### `boardwalk webhooks`: the org's inbound endpoints
 
@@ -268,7 +283,7 @@ Runs are containerized by default (`--host` opts out); Ctrl-C drains. For fleets
 
 ## Project linking (the `--org` flag becomes optional)
 
-The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/project.json` (`{ orgSlug, workflowId }`) and adds `.boardwalk/` to `.gitignore`. It is a local cache, never a source of truth — the org always comes from `--org`, a single-org credential, or this link, in that order, and a multi-org credential with none of them is a hard error, never a guess. Once a directory is linked, `--org` is optional and subsequent commands target the same workflow. Deploy each separate project from its own directory so the links don't clobber each other.
+A successful `deploy` writes a per-directory link at `.boardwalk/project.json` (`{ orgSlug, workflowId }`) and adds `.boardwalk/` to `.gitignore`. It is a local cache, never a source of truth — for `deploy` (and directory-less reads like `runs`/`usage`) the org comes from `--org`, a single-org credential, or this link, in that order, and a multi-org credential with none of them is a hard error, never a guess. `boardwalk run` neither writes nor reads the link: it targets a deployed workflow by slug or id and needs `--org` only with a multi-org credential. Deploy each separate project from its own directory so the links don't clobber each other.
 
 ## Quick reference
 
@@ -288,6 +303,7 @@ The first successful `deploy`/`run` writes a per-directory link at `.boardwalk/p
 | `boardwalk inputs [runId] [--json]` | List human-in-the-loop inputs awaiting a response |
 | `boardwalk respond <runId> <key> [--value\|--values\|--other ...]` | Answer a pending input, resuming the run |
 | `boardwalk usage [--org <slug>] [--days <n>] [--json]` | Org spend and activity |
+| `boardwalk notifications [unread\|read <ids...> --all]` | The org's notification feed |
 | `boardwalk workflows [list\|show\|disable\|enable\|delete] ...` | Inspect and manage workflows |
 | `boardwalk workspace [show\|reset] <workflow> ...` | Inspect / clear a workflow's persistent workspace |
 | `boardwalk webhooks [create\|rotate\|delete]` | Manage the org's inbound webhook endpoints |

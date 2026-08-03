@@ -71,9 +71,11 @@ contract) beside the same `workflow.jsonc`.
   per call: omit it to use Boardwalk's managed inference, or name one to pin it. `provider` defaults
   to the managed lane, or names your own keys. A workflow that does no model work names no model.
 - **Durable primitives do everything else, in plain code:** `secrets.get`, `sleep`, `phase()`,
-  `artifacts.write`, `workflows.call` (invoke another workflow), and `humanInput` (pause for a
-  person). `parallel([...])` runs independent work at once; `auth.idToken`/`auth.apiToken` mint
-  short-lived credentials; `usage.get()` reads live budget state.
+  `artifacts.write`, `workflows.call` (invoke another workflow and wait; `workflows.run` fires one
+  without waiting), and `humanInput` (pause for a person). `parallel([...])` runs independent work
+  at once; `shell` runs a command in the workspace; `auth.idToken`/`auth.apiToken` mint short-lived
+  credentials; `usage.get()` reads live budget state; `computer.openBrowser()` opens a real in-VM
+  browser your program sets up and can hand to an agent (see `equip-agents`).
 - **Each `agent()` can be equipped per call**, on top of the default built-in tools, with reusable
   `skills`, inline `tools`, `mcp` servers, and persistent `memory`. See the `equip-agents` skill.
 

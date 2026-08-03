@@ -1,6 +1,6 @@
 ---
 name: "equip-agents"
-description: "Use when a Boardwalk workflow needs to give an agent() more than a prompt: reusable skills, inline tools, MCP servers, persistent memory, or a human-input gate. Covers the per-call agent() capabilities (skills, tools, mcp, memory, cwd, humanInput, and builtins scoping), short-lived credentials via auth.idToken/auth.apiToken, and the workflow package that bundles a skills/ folder and other assets. A skill is a skills/<name>/SKILL.md the leaf loads on demand through the built-in skill tool (progressive disclosure), anchored to the code-review example. Pairs with boardwalk-use-cli to scaffold, build, and deploy the package."
+description: "Use when a Boardwalk workflow needs to give an agent() more than a prompt: reusable skills, inline tools, MCP servers, persistent memory, a real browser or desktop session, or a human-input gate. Covers the per-call agent() capabilities (skills, tools, mcp, memory, cwd, session, humanInput, and builtins scoping), computer.openBrowser()/openDesktop() and handing the session to a leaf, short-lived credentials via auth.idToken/auth.apiToken, and the workflow package that bundles a skills/ folder and other assets. A skill is a skills/<name>/SKILL.md the leaf loads on demand through the built-in skill tool (progressive disclosure), anchored to the code-review example. Pairs with boardwalk-use-cli to scaffold, build, and deploy the package."
 ---
 
 # Equip an agent() with skills, tools, MCP, and memory
@@ -97,6 +97,28 @@ await agent("Summarize the open issues.", {
 });
 ```
 
+## Hand it a browser or desktop
+
+`computer.openBrowser(opts?)` opens a real Chromium **inside the run's machine** and returns a
+session handle. The handle is for deterministic code: `navigate`, `url()`, `title()`, `screenshot`,
+`console`, `network`, and a program-only `eval`. Set the stage in code first (sign in, land on the
+right page), then hand it over: `agent(prompt, { session: browser })` gives the leaf browser actions
+bound to that one browser — navigate, click, type, read the page. The agent works from the page's
+structure, not screenshots, so any model works.
+
+```ts
+import { agent, computer } from "@boardwalk-labs/workflow";
+
+const browser = await computer.openBrowser({ startUrl: "https://app.example.com" });
+// sign in, navigate — deterministic code owns the setup
+await agent("Export the Q3 revenue report as CSV and save it.", { session: browser });
+```
+
+The session **survives a wait**: still open, still logged in after a `sleep` or `humanInput` gate,
+so log in once and reuse the session all run. It is per-run, not durable — one leaf drives one
+browser; open two sessions for two `parallel` agents; anything left open is reaped at run end.
+`computer.openDesktop()` is the same shape for a full desktop session.
+
 ## Short-lived credentials (`auth`)
 
 When a tool or MCP server calls your own systems, don't bake in long-lived keys — mint on demand.
@@ -136,6 +158,12 @@ path). `memory` stays workspace-root-relative, and a `subagent` inherits its par
 `builtins` controls which engine tools a leaf gets: `"all"` (default), `"read-only"`, `"none"`, or an
 explicit subset. A judge or classifier wants `builtins: "none"` plus a `schema`; analysis wants
 `"read-only"`. Fewer tools mean a smaller prompt and fewer stray turns.
+
+## Other dials
+
+Also on the options object: `name` (a display label for the run log), `maxIterations` (a hard cap on
+the leaf's turns), and `attachments` (files into model context: `mimeType` plus exactly one of
+`data` or `url`, optional `filename`).
 
 ## Gotchas
 
