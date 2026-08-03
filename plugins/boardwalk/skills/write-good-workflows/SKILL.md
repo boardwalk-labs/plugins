@@ -195,6 +195,14 @@ const { verdict } = await agent<Verdict>(`Is this change correct? ...`, {
   large, parallel, or adversarial.
 - **Don't pay to wait.** A long `sleep` suspends the run and releases its machine, so idle time is
   free. Use it instead of a polling loop.
+- **Use an API when one exists.** A browser is the right tool for an app with no API, a flow that
+  only lives in a UI, or a page that renders its data in JavaScript. It is the wrong tool for
+  fetching data something will hand you directly: an API call is faster, cheaper, returns parseable
+  structure instead of a page an agent has to read, and is not subject to the bot checks that
+  challenge automated browsers. Never drive a browser to a search engine; call a search API and open
+  the browser on the result. When a workflow does browse, assert in code where it landed (`url()`,
+  `title()`) and fail with a clear message, so a challenge page stops the run instead of becoming a
+  page the agent burns its budget trying to solve.
 - **Guardrails and reuse.** Set `budget.max_usd` (a guardrail, not the bill; a breach pauses for
   approval). Keep the default machine unless a step is CPU or memory bound. Persist expensive setup
   (a clone, an index) with `"workspace": { "persist": ["repo"] }`. Put must-not-repeat work behind
