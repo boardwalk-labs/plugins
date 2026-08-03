@@ -112,10 +112,12 @@ boardwalk run 01KV4SMQ0JFCNH9X4VQVW10STZ                 # by id, as in a dashbo
 
 `<workflow>` is a **slug or a workflow id**, not a directory: `run` reads nothing from disk — no package, no build, no deploy — so it works from any machine that has a login, on a workflow you have no local copy of. Pass `--org` only when your login covers more than one org. Add `--json` to get `{ runId, status, ... }` on stdout (progress goes to stderr).
 
-**Always pass `--input` when the workflow reads its input.** Omitted, the trigger carries NO input at
-all — not an empty object — so a `run(input)` body sees `undefined` (TS) or `None` (Python) and fails
-in a way that looks like a platform bug. When there is nothing to say, say `--input '{}'`. The same
-applies to `deploy --run`.
+**Pass `--input` whenever the workflow needs one.** Omitted, the trigger carries no input; the
+platform resolves that to `{}` when the workflow's input type is all-optional, so a bare
+`boardwalk run my-flow` works there. An untyped or nullable contract sees `null` (valid by its own
+contract, so guard with `input ?? {}` in code), and a workflow with required input fields must be
+given `--input` (without it the run fails at the first field read). When unsure, `--input '{}'` is
+always safe for an object-shaped input. The same applies to `deploy --run`.
 
 While authoring, `boardwalk deploy <dir> --run` does both in one step (it takes the same `--input` / `--environment` / `--no-wait`):
 
