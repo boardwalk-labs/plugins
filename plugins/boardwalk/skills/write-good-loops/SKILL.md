@@ -210,7 +210,7 @@ import { humanInput, sleep, workflows } from "@boardwalk-labs/workflow";
 
 for (;;) {
   if (await isHealthy(url)) break;
-  await sleep(5 * 60 * 1000);         // 5 min; releases the machine, resumes later, idle free
+  await sleep("5m");                  // releases the machine, resumes later, idle free
 }
 
 const ok = await humanInput({         // run suspends until a person answers; not billed waiting
