@@ -80,7 +80,11 @@ whose product is its side effects.
 
 `context` (param 1, declare it only when needed) is read-only metadata: `runId`, `workflowId`,
 `workflowVersion`, `orgId`, `trigger`, `actor`, `attempt`, `environment` (`{ id, name }`, or `null`
-for the org base), `workspaceDir`, `signal`. Data only — everything that acts is an import.
+for the org base), `workspaceDir`, `signal`. Data only — everything that acts is an import. On a
+webhook run `context.trigger.event` is the SENDER's own name for the delivery (`pull_request`,
+`ping`) when the endpoint's preset carries one in a header (`github`, `linear`, `sentry`) — branch
+on it instead of guessing the event from the body's shape. Senders that put the event type in the
+body (Stripe, Slack) leave it undefined, because your program already reads the body.
 
 ## The descriptor
 
@@ -94,7 +98,11 @@ every scheduled run, and a `webhook` trigger NAMES one of the org's webhooks,
 allowlist a run may `secrets.get`; `id_token` for `auth.idToken`), `budget` (`max_usd`,
 `max_tokens`, `max_compute_seconds` — all metered; a breach pauses the run for approval, never a
 hard kill), `concurrency` (`unlimited` default, `serial`, or per-entity
-`{ "mode": "serial", "key": "refund-${input.customerId}" }`), `workspace` (directories to persist
+`{ "mode": "serial", "key": "refund-${input.customerId}" }`; `latest_wins` is the same lane except a
+new run replaces the ones still WAITING in it, for level-triggered work where the freshest input
+subsumes the stale ones — a running sibling is never touched. Give a key a fallback for payloads
+that legitimately lack the field, `"${input.repository.full_name ?? 'none'}"`, or each one fails the
+run), `workspace` (directories to persist
 between runs), and `runs_on` (the machine, default `boardwalk/linux`). The workflow declares **no**
 model and no I/O schemas — those come from your types.
 
