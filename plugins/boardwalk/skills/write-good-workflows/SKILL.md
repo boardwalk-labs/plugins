@@ -81,10 +81,12 @@ whose product is its side effects.
 `context` (param 1, declare it only when needed) is read-only metadata: `runId`, `workflowId`,
 `workflowVersion`, `orgId`, `trigger`, `actor`, `attempt`, `environment` (`{ id, name }`, or `null`
 for the org base), `workspaceDir`, `signal`. Data only — everything that acts is an import. On a
-webhook run `context.trigger.event` is the SENDER's own name for the delivery (`pull_request`,
-`ping`) when the endpoint's preset carries one in a header (`github`, `linear`, `sentry`) — branch
-on it instead of guessing the event from the body's shape. Senders that put the event type in the
-body (Stripe, Slack) leave it undefined, because your program already reads the body.
+webhook run `context.trigger.request` is the delivery as the HTTP request it arrived as
+(`{ method, path, query, headers }`, header names lower-cased), so branch on what your sender
+actually sends instead of guessing from the body's shape:
+`context.trigger.request?.headers["x-github-event"]` for GitHub, `input.type` for Stripe (it names
+its event in the body, which is already your input). Whatever authenticated the delivery is stripped
+before you see it.
 
 ## The descriptor
 
