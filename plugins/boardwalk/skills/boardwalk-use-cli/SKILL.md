@@ -101,6 +101,8 @@ The org is resolved deterministically, never guessed: `--org` wins; else a singl
 
 **Python packages deploy only from here.** The MCP tools and the web Code tab build server-side, which can't materialize a Python dependency layer, so they refuse a `.py` package (the web Code tab renders it read-only). TypeScript deploys from all three.
 
+**A run pins its version when it is CREATED, not when it starts.** A deploy publishes a new version for everything triggered *after* it lands; a run created seconds earlier keeps executing the old one, however long it queues. That is what you want for an in-flight run, but it means "deploy, then immediately fire a webhook / trigger by hand" is a race with your own deploy: if the new code did not run, check the run's version before re-reading the diff. `boardwalk deploy --run` has no such race — it triggers after the deploy returns.
+
 ### `boardwalk run <workflow>`: run a DEPLOYED workflow, wait for the result
 
 ```bash
@@ -230,6 +232,8 @@ boardwalk secrets delete GITHUB_TOKEN --yes
 ```
 
 Writing or deleting secrets needs `boardwalk login --scopes admin`. `--scope` is `org` (default) or `user`; `--kind` is `api_key` (default), `oauth_token`, `aws_role`, or `mcp_credential`.
+
+`set` on a name that already exists **replaces the value in place** (same secret, same reference), so a mangled or expired credential is repaired with one command — no rename, no redeploy of the workflows that read it. A name that exists only inside an *environment* is edited in the console instead, since which environment was meant is ambiguous.
 
 ### `boardwalk environments` / `boardwalk variables`: environment config (GitHub-Actions style)
 
